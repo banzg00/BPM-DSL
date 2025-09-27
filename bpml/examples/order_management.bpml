@@ -1,0 +1,406 @@
+// Order Management Process Example
+// This example demonstrates a comprehensive e-commerce order processing workflow
+
+project {
+    name: "OrderManagementSystem"
+    description: "E-commerce order processing and fulfillment system"
+    version: "1.0"
+    author: "BPML Team"
+}
+
+// Define entities for the order management domain
+entity Order {
+    orderId: str
+    customerId: str
+    customerEmail: email
+    orderDate: dateTime
+    totalAmount: decimal
+    status: str
+    shippingAddress: Address @1..1
+    items: OrderItem @1..*
+}
+
+entity OrderItem {
+    productId: str
+    productName: str
+    quantity: int
+    unitPrice: decimal
+    lineTotal: decimal
+}
+
+entity Address {
+    street: str
+    city: str
+    state: str
+    zipCode: str
+    country: str
+}
+
+entity Payment {
+    paymentId: str
+    orderId: str
+    amount: decimal
+    method: str
+    status: str
+    transactionDate: dateTime
+}
+
+entity Shipment {
+    shipmentId: str
+    orderId: str
+    trackingNumber: str
+    carrier: str
+    shippedDate: dateTime
+    estimatedDelivery: date
+}
+
+// Define roles in the order management process
+role Customer {
+    permissions: [view_order, cancel_order]
+    description: "End customer who places orders"
+}
+
+role SalesAgent extends Customer {
+    permissions: [validate_order, modify_order, contact_customer]
+    description: "Sales representative handling customer orders"
+}
+
+role WarehouseWorker {
+    permissions: [update_inventory, prepare_shipment, scan_items]
+    description: "Warehouse staff handling inventory and shipping"
+}
+
+role FinanceManager {
+    permissions: [process_refunds, review_payments, approve_credits]
+    description: "Finance team member handling payments and refunds"
+}
+
+role Manager {
+    permissions: [override_decisions, view_reports, assign_tasks]
+    description: "Operations manager with override capabilities"
+}
+
+// Main order processing workflow
+process OrderProcessing {
+    description: "Complete order processing from submission to delivery"
+    version: "2.1"
+
+    // Start the process when an order is submitted
+    start OrderSubmitted {
+        trigger: "order_created"
+        data: Order order
+        condition: "order.totalAmount > 0"
+    }
+
+    // Initial order validation by sales team
+    userTask ValidateOrder {
+        assignee: role(SalesAgent)
+        candidateGroups: [SalesAgent, Manager]
+        priority: high
+        dueDate: "+2h"
+
+        form: OrderValidationForm {
+            title: "Validate Customer Order"
+            fields: {
+                orderId: text readonly
+                customerEmail: email readonly
+                totalAmount: number readonly
+                itemCount: number readonly
+                validationStatus: select required
+                rejectionReason: textarea
+                customerNotes: textarea
+            }
+            validation: {
+                validationStatus: required()
+                rejectionReason: required() when validationStatus == "rejected"
+            }
+        }
+
+        onComplete: {
+            if (form.validationStatus == "approved") -> ProcessPayment
+            else -> RejectOrder
+        }
+    }
+
+    // Process payment for validated orders
+    serviceTask ProcessPayment {
+        implementation: "PaymentService.processPayment"
+        input: order
+        output: paymentResult
+        retryCount: 3
+        timeout: 30000
+
+        onSuccess -> CheckInventory
+        onFailure -> PaymentFailed
+    }
+
+    // Check inventory availability
+    serviceTask CheckInventory {
+        implementation: "InventoryService.checkAvailability"
+        input: order.items
+        output: inventoryStatus
+
+        onSuccess -> InventoryAvailable
+        onFailure -> InventoryShortage
+    }
+
+    // Decision point for inventory availability
+    exclusiveGateway InventoryAvailable {
+        if (inventoryStatus.allAvailable == true) -> AllocateInventory
+        if (inventoryStatus.partialAvailable == true) -> HandlePartialInventory
+        defaultFlow -> InventoryShortage
+    }
+
+    // Handle partial inventory scenarios
+    userTask HandlePartialInventory {
+        assignee: role(SalesAgent)
+        form: PartialInventoryForm {
+            title: "Handle Partial Inventory"
+            fields: {
+                availableItems: entity readonly
+                unavailableItems: entity readonly
+                customerAction: select required
+                backorderDate: date
+                alternativeProducts: multiselect
+            }
+        }
+
+        onComplete: {
+            if (form.customerAction == "accept_partial") -> AllocateInventory
+            if (form.customerAction == "wait_full") -> BackorderItems
+            else -> CancelOrder
+        }
+    }
+
+    // Allocate available inventory
+    serviceTask AllocateInventory {
+        implementation: "InventoryService.allocateItems"
+        input: order
+        output: allocationResult
+
+        onSuccess -> PrepareShipment
+        onFailure -> AllocationFailed
+    }
+
+    // Parallel tasks for order fulfillment
+    parallelGateway SplitFulfillment
+
+    // Prepare shipment in warehouse
+    userTask PrepareShipment {
+        assignee: role(WarehouseWorker)
+        priority: normal
+
+        form: ShipmentPreparationForm {
+            title: "Prepare Order Shipment"
+            fields: {
+                orderId: text readonly
+                items: entity readonly
+                packingSlips: checkbox required
+                itemsVerified: checkbox required
+                packagingType: select required
+                weight: number required
+                dimensions: text
+            }
+            validation: {
+                packingSlips: required()
+                itemsVerified: required()
+                weight: min(0.1)
+            }
+        }
+
+        onComplete: -> CreateShippingLabel
+    }
+
+    // Generate shipping documentation
+    serviceTask CreateShippingLabel {
+        implementation: "ShippingService.createLabel"
+        input: order
+        output: shippingLabel
+
+        onSuccess -> NotifyCustomer
+        onFailure -> ShippingLabelError
+    }
+
+    // Update customer with tracking information
+    serviceTask NotifyCustomer {
+        implementation: "NotificationService.sendTrackingInfo"
+        input: order
+        output: notificationResult
+
+        onSuccess -> CompleteOrder
+        onFailure -> NotificationFailed
+    }
+
+    // Parallel process: Update order status
+    serviceTask UpdateOrderStatus {
+        implementation: "OrderService.updateStatus"
+        input: order
+        output: statusUpdate
+
+        onSuccess -> CompleteOrder
+        onFailure -> StatusUpdateFailed
+    }
+
+    // Join parallel processes
+    parallelGateway JoinFulfillment {
+        joinType: all
+    }
+
+    // Successfully complete the order
+    end CompleteOrder {
+        condition: "order.status == 'SHIPPED'"
+        actions: {
+            sendNotification(order.customerEmail, "Your order has been shipped!")
+            updateEntity("Order", "status", "COMPLETED")
+            callService("AnalyticsService", "recordSuccess", order.orderId)
+        }
+    }
+
+    // Handle order rejection
+    end RejectOrder {
+        condition: "validation_failed"
+        actions: {
+            sendNotification(order.customerEmail, "Your order has been rejected")
+            updateEntity("Order", "status", "REJECTED")
+            executeScript("refund_processor.js")
+        }
+    }
+
+    // Handle payment failures
+    end PaymentFailed {
+        condition: "payment_error"
+        actions: {
+            sendNotification(order.customerEmail, "Payment processing failed")
+            updateEntity("Order", "status", "PAYMENT_FAILED")
+            startProcess(PaymentRetryProcess, order.orderId)
+        }
+    }
+
+    // Handle inventory shortages
+    end InventoryShortage {
+        condition: "insufficient_inventory"
+        actions: {
+            sendNotification(order.customerEmail, "Items temporarily unavailable")
+            updateEntity("Order", "status", "BACKORDERED")
+            callService("InventoryService", "createRestockRequest", order.items)
+        }
+    }
+
+    // Handle cancellations
+    end CancelOrder {
+        condition: "customer_cancelled"
+        actions: {
+            sendNotification(order.customerEmail, "Your order has been cancelled")
+            updateEntity("Order", "status", "CANCELLED")
+            callService("PaymentService", "processRefund", order.orderId)
+        }
+    }
+
+    // Define the process flow
+    flows: {
+        flow1: OrderSubmitted -> ValidateOrder
+        flow2: ValidateOrder -> ProcessPayment when (validationStatus == "approved")
+        flow3: ValidateOrder -> RejectOrder when (validationStatus == "rejected")
+        flow4: ProcessPayment -> CheckInventory
+        flow5: CheckInventory -> InventoryAvailable
+        flow6: InventoryAvailable -> AllocateInventory when (allAvailable == true)
+        flow7: InventoryAvailable -> HandlePartialInventory when (partialAvailable == true)
+        flow8: InventoryAvailable -> InventoryShortage when (noAvailability == true)
+        flow9: AllocateInventory -> SplitFulfillment
+        flow10: SplitFulfillment -> PrepareShipment
+        flow11: SplitFulfillment -> UpdateOrderStatus
+        flow12: PrepareShipment -> CreateShippingLabel
+        flow13: CreateShippingLabel -> NotifyCustomer
+        flow14: NotifyCustomer -> JoinFulfillment
+        flow15: UpdateOrderStatus -> JoinFulfillment
+        flow16: JoinFulfillment -> CompleteOrder
+    }
+}
+
+// Secondary process for handling payment retries
+process PaymentRetryProcess {
+    description: "Automated payment retry workflow"
+
+    start PaymentRetryInitiated {
+        trigger: "payment_retry_requested"
+        data: str orderId
+    }
+
+    // Wait before retry
+    intermediate WaitForRetry {
+        type: timer
+        timeout: 3600000  // 1 hour
+    }
+
+    // Retry payment processing
+    serviceTask RetryPayment {
+        implementation: "PaymentService.retryPayment"
+        input: orderId
+        output: retryResult
+        retryCount: 2
+
+        onSuccess -> PaymentRetrySuccess
+        onFailure -> PaymentRetryFailed
+    }
+
+    end PaymentRetrySuccess {
+        actions: {
+            startProcess(OrderProcessing, orderId)
+        }
+    }
+
+    end PaymentRetryFailed {
+        actions: {
+            sendNotification("finance@company.com", "Manual payment intervention required")
+            updateEntity("Order", "status", "PAYMENT_REVIEW")
+        }
+    }
+}
+
+// Dashboard for order management
+dashboard OrderManagementDashboard {
+    title: "Order Management Dashboard"
+    description: "Real-time monitoring of order processing workflows"
+
+    widgets: {
+        activeOrders: processInstanceList {
+            title: "Active Orders"
+            filter: "status != 'COMPLETED' AND status != 'CANCELLED'"
+            columns: ["orderId", "customerEmail", "totalAmount", "status", "currentTask"]
+            actions: [view, edit]
+        }
+
+        pendingTasks: taskList {
+            title: "My Pending Tasks"
+            filter: "assignee == currentUser OR candidateGroups CONTAINS currentUserRole"
+            groupBy: "priority"
+            actions: [complete, delegate, claim]
+        }
+
+        orderMetrics: metrics {
+            title: "Order Processing Metrics"
+            charts: [
+                averageProcessTime,
+                tasksCompletedToday,
+                processInstancesByStatus,
+                tasksByAssignee
+            ]
+        }
+
+        revenueChart: chart RevenueChart {
+            type: line
+            title: "Daily Revenue Trend"
+            dataSource: "SELECT date, SUM(totalAmount) FROM orders GROUP BY date ORDER BY date"
+            xAxis: "date"
+            yAxis: "revenue"
+        }
+
+        inventoryAlert: chart InventoryStatus {
+            type: bar
+            title: "Low Inventory Items"
+            dataSource: "SELECT productName, quantity FROM inventory WHERE quantity < reorderLevel"
+            xAxis: "productName"
+            yAxis: "quantity"
+        }
+    }
+}

@@ -1,0 +1,361 @@
+BusinessProcessModel:
+    project_info = ProjectInfo
+    (entities += Entity)*
+    (roles += Role)*
+    (processes += Process)+
+    (dashboards += Dashboard)*
+;
+
+ProjectInfo:
+    'project' '{'
+        'name' ':' projectName=ID
+        ('description' ':' description=STRING)?
+        ('version' ':' version=STRING)?
+        ('author' ':' author=STRING)?
+    '}'
+;
+
+// ============ ENTITIES AND DATA MODELS ============
+
+Entity:
+    'entity' name=ID '{'
+        properties+=Property
+    '}'
+;
+
+Property:
+    Attribute | Relationship
+;
+
+Attribute:
+    name=ID ':' type=SimpleType isList?='[]' isOptional?='?'
+;
+
+Relationship:
+    name=ID ':' type=[Entity] cardinality=Cardinality isOptional?='?'
+;
+
+// ============ ROLES AND SECURITY ============
+
+Role:
+    'role' name=ID ('extends' parent=[Role])? '{'
+        ('permissions' ':' '[' permissions*=Permission[','] ']')?
+        ('description' ':' description=STRING)?
+    '}'
+;
+
+Permission:
+    name=ID
+;
+
+// ============ BUSINESS PROCESS DEFINITION ============
+
+Process:
+    'process' name=ID '{'
+        ('description' ':' description=STRING)?
+        ('version' ':' version=STRING)?
+        elements+=ProcessElement
+        ('flows' ':' '{' flows+=SequenceFlow '}' )?
+    '}'
+;
+
+ProcessElement:
+    StartEvent | EndEvent | IntermediateEvent |
+    UserTask | ServiceTask | ScriptTask |
+    ExclusiveGateway | ParallelGateway | InclusiveGateway |
+    DataObject
+;
+
+// ============ EVENTS ============
+
+StartEvent:
+    'start' name=ID '{'
+        ('trigger' ':' trigger=STRING)?
+        ('data' ':' data=DataBinding)?
+        ('condition' ':' condition=STRING)?
+    '}'
+;
+
+EndEvent:
+    'end' name=ID '{'
+        ('condition' ':' condition=STRING)?
+        ('actions' ':' '{' actions+=Action '}' )?
+    '}'
+;
+
+IntermediateEvent:
+    'intermediate' name=ID '{'
+        'type' ':' eventType=IntermediateEventType
+        ('condition' ':' condition=STRING)?
+        ('timeout' ':' timeout=INT)?
+        ('actions' ':' '{' actions+=Action '}' )?
+    '}'
+;
+
+IntermediateEventType:
+    'timer' | 'message' | 'signal' | 'error' | 'escalation' | 'compensation'
+;
+
+// ============ TASKS ============
+
+UserTask:
+    'userTask' name=ID '{'
+        ('assignee' ':' assignee=TaskAssignee)?
+        ('candidateGroups' ':' '[' candidateGroups*=[Role][','] ']')?
+        ('form' ':' form=Form)?
+        ('dueDate' ':' dueDate=STRING)?
+        ('priority' ':' priority=TaskPriority)?
+        ('onComplete' ':' '{' completionActions+=CompletionAction '}' )?
+        ('onTimeout' ':' '{' timeoutActions+=Action '}' )?
+    '}'
+;
+
+ServiceTask:
+    'serviceTask' name=ID '{'
+        'implementation' ':' implementation=STRING
+        ('input' ':' input=DataBinding)?
+        ('output' ':' output=DataBinding)?
+        ('onSuccess' ':' successTarget=[ProcessElement])?
+        ('onFailure' ':' failureTarget=[ProcessElement])?
+        ('retryCount' ':' retryCount=INT)?
+        ('timeout' ':' timeout=INT)?
+    '}'
+;
+
+ScriptTask:
+    'scriptTask' name=ID '{'
+        'script' ':' script=STRING
+        ('language' ':' scriptLanguage=ScriptLanguage)?
+        ('input' ':' input=DataBinding)?
+        ('output' ':' output=DataBinding)?
+    '}'
+;
+
+// ============ GATEWAYS ============
+
+ExclusiveGateway:
+    'exclusiveGateway' name=ID '{'
+        ('defaultFlow' ':' defaultFlow=[ProcessElement])?
+        conditions+=GatewayCondition
+    '}'
+;
+
+ParallelGateway:
+    'parallelGateway' name=ID '{'
+        ('joinType' ':' joinType=JoinType)?
+    '}'
+;
+
+InclusiveGateway:
+    'inclusiveGateway' name=ID '{'
+        ('defaultFlow' ':' defaultFlow=[ProcessElement])?
+        conditions+=GatewayCondition
+    '}'
+;
+
+GatewayCondition:
+    'if' '(' condition=STRING ')' '->' target=[ProcessElement]
+;
+
+// ============ DATA AND FORMS ============
+
+DataObject:
+    'dataObject' name=ID '{'
+        'type' ':' dataType=DataType
+        ('scope' ':' scope=DataScope)?
+        ('defaultValue' ':' defaultValue=STRING)?
+        ('validation' ':' validation=STRING)?
+    '}'
+;
+
+DataBinding:
+    TypedVariable | entityRef=[Entity] | dataObjectRef=[DataObject] | expression=STRING
+;
+
+TypedVariable:
+    type=DataType variableName=ID
+;
+
+Form:
+    name=ID 'Form' '{'
+        ('title' ':' title=STRING)?
+        'fields' ':' '{' fields+=FormField '}'
+        ('validation' ':' '{' validations+=FormValidation '}' )?
+        ('layout' ':' layout=FormLayout)?
+    '}'
+;
+
+FormField:
+    name=ID ':' fieldType=FormFieldType ('readonly' readonly?='readonly')? ('required' required?='required')?
+;
+
+FormValidation:
+    field=[FormField] ':' validationType=ValidationType '(' parameters=STRING ')'
+;
+
+// ============ TASK ASSIGNMENTS AND ACTIONS ============
+
+TaskAssignee:
+    RoleAssignee | UserAssignee | ExpressionAssignee
+;
+
+RoleAssignee:
+    'role' '(' role=[Role] ')'
+;
+
+UserAssignee:
+    'user' '(' username=STRING ')'
+;
+
+ExpressionAssignee:
+    'expression' '(' expression=STRING ')'
+;
+
+CompletionAction:
+    ConditionalFlow | DirectFlow | ActionCall
+;
+
+ConditionalFlow:
+    'if' '(' condition=STRING ')' '->' target=[ProcessElement]
+    ('else' '->' elseTarget=[ProcessElement])?
+;
+
+DirectFlow:
+    '->' target=[ProcessElement]
+;
+
+ActionCall:
+    'call' '(' action=Action ')'
+;
+
+Action:
+    'sendNotification' '(' recipient=STRING ',' message=STRING ')' |
+    'updateEntity' '(' entity=STRING ',' field=STRING ',' value=STRING ')' |
+    'executeScript' '(' script=STRING ')' |
+    'startProcess' '(' process=[Process] ',' data=STRING ')' |
+    'callService' '(' service=STRING ',' method=STRING ',' parameters=STRING ')'
+;
+
+// ============ SEQUENCE FLOWS ============
+
+SequenceFlow:
+    name=ID? ':' source=[ProcessElement] '->' target=[ProcessElement]
+    ('when' '(' condition=STRING ')')?
+;
+
+// ============ DASHBOARDS ============
+
+Dashboard:
+    'dashboard' name=ID '{'
+        'title' ':' title=STRING
+        ('description' ':' description=STRING)?
+        'widgets' ':' '{' widgets+=Widget '}'
+    '}'
+;
+
+Widget:
+    ProcessInstanceList | TaskList | ProcessMetrics | CustomChart
+;
+
+ProcessInstanceList:
+    'processInstanceList' ':' '{'
+        'title' ':' title=STRING
+        ('filter' ':' filter=STRING)?
+        'columns' ':' '[' columns*=STRING[','] ']'
+        ('actions' ':' '[' actions*=WidgetAction[','] ']')?
+    '}'
+;
+
+TaskList:
+    'taskList' ':' '{'
+        'title' ':' title=STRING
+        ('filter' ':' filter=STRING)?
+        ('groupBy' ':' groupBy=STRING)?
+        'actions' ':' '[' actions*=WidgetAction[','] ']'
+    '}'
+;
+
+ProcessMetrics:
+    'metrics' ':' '{'
+        'title' ':' title=STRING
+        'charts' ':' '[' charts*=MetricChart[','] ']'
+    '}'
+;
+
+CustomChart:
+    'chart' name=ID ':' '{'
+        'type' ':' chartType=ChartType
+        'title' ':' title=STRING
+        'dataSource' ':' dataSource=STRING
+        ('xAxis' ':' xAxis=STRING)?
+        ('yAxis' ':' yAxis=STRING)?
+    '}'
+;
+
+// ============ ENUMS AND TYPES ============
+
+SimpleType:
+    name=/int|str|float|bool|long|dateTime|date|decimal|text|email|phone|url/
+;
+
+DataType:
+    SimpleType | EntityType | ListType
+;
+
+EntityType:
+    entity=[Entity]
+;
+
+ListType:
+    elementType=DataType '[]'
+;
+
+FormFieldType:
+    'text' | 'number' | 'email' | 'password' | 'textarea' | 'select' | 'multiselect' |
+    'checkbox' | 'radio' | 'date' | 'datetime' | 'file' | 'bool' | 'entity'
+;
+
+FormLayout:
+    'vertical' | 'horizontal' | 'grid'
+;
+
+ValidationType:
+    'required' | 'minLength' | 'maxLength' | 'pattern' | 'min' | 'max' | 'email' | 'custom'
+;
+
+TaskPriority:
+    'low' | 'normal' | 'high' | 'critical'
+;
+
+ScriptLanguage:
+    'javascript' | 'groovy' | 'python'
+;
+
+DataScope:
+    'process' | 'global' | 'task'
+;
+
+JoinType:
+    'all' | 'any' | 'majority'
+;
+
+ChartType:
+    'line' | 'bar' | 'pie' | 'donut' | 'area' | 'scatter'
+;
+
+MetricChart:
+    'averageProcessTime' | 'tasksCompletedToday' | 'processInstancesByStatus' |
+    'tasksByAssignee' | 'overdueTasks' | 'processThroughput'
+;
+
+WidgetAction:
+    'complete' | 'delegate' | 'claim' | 'release' | 'view' | 'edit' | 'delete' | 'start'
+;
+
+Cardinality:
+    '@1..1' | '@1..*' | '@*..1' | '@*..*' | '@0..1' | '@0..*'
+;
+
+Comment:
+    /\/\/.*$/
+;
