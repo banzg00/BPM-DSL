@@ -1,0 +1,217 @@
+// Invoice Approval Business Process
+// This demonstrates a complete business process with entities, roles, states, and workflow
+
+project {
+    name: InvoiceApprovalSystem
+    description: "Automated invoice approval workflow with multi-level authorization"
+    version: "1.0.0"
+    author: "BPML Team"
+}
+
+process InvoiceApproval {
+    // Define the domain entities
+    entity Invoice {
+        invoiceNumber: string
+        vendor: string
+        amount: float
+        description: string
+        invoiceDate: string
+        dueDate: string
+        category: enum { SUPPLIES, SERVICES, EQUIPMENT, TRAVEL }
+        attachmentUrl: string
+    }
+
+    entity ApprovalRecord {
+        approver: string
+        decision: enum { APPROVED, REJECTED, PENDING }
+        comments: string
+        timestamp: string
+    }
+
+    entity PaymentInfo {
+        paymentMethod: enum { BANK_TRANSFER, CHECK, CREDIT_CARD }
+        paymentDate: string
+        transactionId: string
+    }
+
+    // Define roles in the process
+    role Employee
+    role Manager
+    role FinanceTeam
+    role CFO
+    role AccountsPayable
+
+    // Define process states
+    state DraftState
+    state SubmittedForApprovalState
+    state ManagerReviewState
+    state FinanceReviewState
+    state CFOApprovalState
+    state ApprovedState
+    state RejectedState
+    state PaymentProcessingState
+    state CompletedState
+
+    // Define workflow steps
+    step CreateInvoice by Employee affects Invoice
+    step SubmitInvoice by Employee affects Invoice
+    step ReviewByManager by Manager affects Invoice
+    step ReviewByFinance by FinanceTeam affects Invoice
+    step ApprovalByCFO by CFO affects Invoice
+    step ProcessPayment by AccountsPayable affects PaymentInfo
+    step RecordApproval by Manager affects ApprovalRecord
+    step RecordFinanceApproval by FinanceTeam affects ApprovalRecord
+    step RecordCFOApproval by CFO affects ApprovalRecord
+    step RejectInvoice by Manager affects Invoice
+    step CloseInvoice by AccountsPayable affects Invoice
+
+    // Define state transitions
+    transition InitiateDraftTransition
+        from DraftState
+        to SubmittedForApprovalState
+        by Employee
+
+    transition SendToManagerTransition
+        from SubmittedForApprovalState
+        to ManagerReviewState
+        by Employee
+
+    transition ManagerApprovesTransition
+        from ManagerReviewState
+        to FinanceReviewState
+        by Manager
+
+    transition ManagerRejectsTransition
+        from ManagerReviewState
+        to RejectedState
+        by Manager
+
+    transition FinanceApprovesTransition
+        from FinanceReviewState
+        to CFOApprovalState
+        by FinanceTeam
+
+    transition FinanceRejectsTransition
+        from FinanceReviewState
+        to RejectedState
+        by FinanceTeam
+
+    transition CFOApprovesTransition
+        from CFOApprovalState
+        to ApprovedState
+        by CFO
+
+    transition CFORejectsTransition
+        from CFOApprovalState
+        to RejectedState
+        by CFO
+
+    transition SendToPaymentTransition
+        from ApprovedState
+        to PaymentProcessingState
+        by AccountsPayable
+
+    transition CompleteProcessTransition
+        from PaymentProcessingState
+        to CompletedState
+        by AccountsPayable
+
+    // Define the process flow
+    flow CreateInvoice, SubmitInvoice, ReviewByManager, ReviewByFinance, ApprovalByCFO, ProcessPayment, CloseInvoice
+}
+
+
+// Second process example: Employee Onboarding
+process EmployeeOnboarding {
+    // Domain entities for onboarding
+    entity Employee {
+        firstName: string
+        lastName: string
+        email: string
+        phone: string
+        position: string
+        department: string
+        startDate: string
+        employeeId: string
+    }
+
+    entity Equipment {
+        laptopModel: string
+        phoneNumber: string
+        accessCard: string
+        isAssigned: boolean
+    }
+
+    entity TrainingRecord {
+        trainingModule: string
+        completedDate: string
+        score: int
+        isPassed: boolean
+    }
+
+    // Roles
+    role HR
+    role ITSupport
+    role Supervisor
+    role Trainer
+    role NewEmployee
+
+    // States
+    state NewState
+    state DocumentsSubmittedState
+    state BackgroundCheckState
+    state ApprovedOnboardingState
+    state EquipmentSetupState
+    state TrainingScheduledState
+    state InTrainingState
+    state ActiveState
+
+    // Steps
+    step SubmitDocuments by NewEmployee affects Employee
+    step VerifyDocuments by HR affects Employee
+    step RunBackgroundCheck by HR affects Employee
+    step SetupWorkstation by ITSupport affects Equipment
+    step AssignEquipment by ITSupport affects Equipment
+    step ScheduleOrientation by HR affects TrainingRecord
+    step ConductTraining by Trainer affects TrainingRecord
+    step ActivateEmployee by Supervisor affects Employee
+
+    // Transitions
+    transition SubmitEmployeeInfoTransition
+        from NewState
+        to DocumentsSubmittedState
+        by NewEmployee
+
+    transition InitiateBackgroundCheckTransition
+        from DocumentsSubmittedState
+        to BackgroundCheckState
+        by HR
+
+    transition ApproveOnboardingTransition
+        from BackgroundCheckState
+        to ApprovedOnboardingState
+        by HR
+
+    transition PrepareEquipmentTransition
+        from ApprovedOnboardingState
+        to EquipmentSetupState
+        by ITSupport
+
+    transition ScheduleTrainingTransition
+        from EquipmentSetupState
+        to TrainingScheduledState
+        by HR
+
+    transition BeginTrainingTransition
+        from TrainingScheduledState
+        to InTrainingState
+        by Trainer
+
+    transition CompleteOnboardingTransition
+        from InTrainingState
+        to ActiveState
+        by Supervisor
+
+    // Workflow
+    flow SubmitDocuments, VerifyDocuments, RunBackgroundCheck, SetupWorkstation, AssignEquipment, ScheduleOrientation, ConductTraining, ActivateEmployee
+}

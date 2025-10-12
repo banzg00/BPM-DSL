@@ -1,92 +1,43 @@
 """
 BPML (Business Process Modeling Language) Package
 
-A comprehensive DSL for defining business processes that can generate
-Spring Boot and React applications with CRUD operations and process management.
-
-This package provides:
-- TextX grammar for business process modeling (bpml.tx)
-- Custom model classes for enhanced functionality (custom_model.py)
-- Semantic validation and processors (processors.py)
-- Utility functions for process analysis (utils.py)
-- Example process definitions (examples/)
-
-Usage:
-    from textx import metamodel_from_file
-    from bpml.processors import semantic_check
-    from bpml.custom_model import ProcessInstance
-
-    # Load BPML metamodel
-    metamodel = metamodel_from_file('bpml.tx')
-    metamodel.register_model_processor(semantic_check)
-
-    # Parse a BPML model
-    model = metamodel.model_from_file('examples/order_management.bpml')
-
-    # Create process instance
-    process = model.processes[0]
-    instance = ProcessInstance(process)
-    instance.start()
+A minimal DSL for defining business processes with entities, roles, and workflows.
 """
 
 import os
 from textx import language, metamodel_from_file
+from .custom_model import SimpleType, DataType
+from .builtins import simple_types
+from .processors import semantic_check
 
-__version__ = "1.0.0"
-__author__ = "BPML Development Team"
+__version__ = "0.1.0"
 
-# Import main components for easy access
-try:
-    from .processors import semantic_check
-    from .custom_model import ProcessInstance, TaskInstance, ProcessAnalyzer
-    from .utils import (
-        ProcessAnalyzer as UtilProcessAnalyzer,
-        EntityExtractor,
-        FormGenerator,
-        RoleHierarchyAnalyzer,
-        generate_process_documentation,
-        validate_process_completeness,
-        estimate_process_execution_time
-    )
-except ImportError:
-    # Handle case where modules are not yet available
-    pass
+THIS_FOLDER = os.path.dirname(__file__)
 
-__all__ = [
-    'semantic_check',
-    'ProcessInstance',
-    'TaskInstance',
-    'ProcessAnalyzer',
-    'UtilProcessAnalyzer',
-    'EntityExtractor',
-    'FormGenerator',
-    'RoleHierarchyAnalyzer',
-    'generate_process_documentation',
-    'validate_process_completeness',
-    'estimate_process_execution_time'
-]
+
+def get_custom_classes():
+    """Return list of custom model classes to register with TextX"""
+    return [SimpleType, DataType]
 
 
 @language('bpml', '*.bpml')
 def bpml_language():
-    """BPML language definition with enhanced functionality"""
-    current_dir = os.path.dirname(__file__)
-    mm = metamodel_from_file(os.path.join(current_dir, 'bpml.tx'))
+    """BPML language definition"""
 
-    # Register semantic processor for validation
-    try:
-        from .processors import semantic_check
-        mm.register_model_processor(semantic_check)
-    except ImportError:
-        pass
+    bpml_grammar_path = os.path.join(THIS_FOLDER, 'bpml.tx')
 
-    # Register custom model classes
-    try:
-        from .custom_model import SimpleType
-        mm.register_scope_providers({
-            '*': lambda obj: []  # Default scope provider
-        })
-    except ImportError:
-        pass
+    metamodel = metamodel_from_file(
+        bpml_grammar_path,
+        classes=get_custom_classes(),
+        builtins=simple_types,
+        debug=False
+    )
 
-    return mm
+    # Register semantic validation processor
+    metamodel.register_model_processor(semantic_check)
+
+    # Here if necessary register object processors or scope providers
+    # http://textx.github.io/textX/stable/metamodel/#object-processors
+    # http://textx.github.io/textX/stable/scoping/
+
+    return metamodel
