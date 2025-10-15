@@ -1,0 +1,24 @@
+package {{ group_name }}.{{ app_name_lower }}.process.repository;
+
+import {{ group_name }}.{{ app_name_lower }}.process.model.TaskInstance;
+import {{ group_name }}.{{ app_name_lower }}.process.model.TaskInstance.TaskStatus;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
+
+import java.util.List;
+
+@Repository
+public interface TaskInstanceRepository extends JpaRepository<TaskInstance, Long> {
+
+    List<TaskInstance> findByProcessInstanceId(Long processInstanceId);
+
+    List<TaskInstance> findByAssignedRole(String assignedRole);
+
+    List<TaskInstance> findByAssignedUser(String assignedUser);
+
+    List<TaskInstance> findByStatus(TaskStatus status);
+
+    List<TaskInstance> findByAssignedRoleAndStatus(String assignedRole, TaskStatus status);
+
+    List<TaskInstance> findByAssignedUserAndStatus(String assignedUser, TaskStatus status);
+}

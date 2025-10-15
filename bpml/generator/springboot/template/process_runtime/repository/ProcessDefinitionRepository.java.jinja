@@ -1,0 +1,15 @@
+package {{ group_name }}.{{ app_name_lower }}.process.repository;
+
+import {{ group_name }}.{{ app_name_lower }}.process.model.ProcessDefinition;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
+
+import java.util.Optional;
+
+@Repository
+public interface ProcessDefinitionRepository extends JpaRepository<ProcessDefinition, Long> {
+
+    Optional<ProcessDefinition> findByProcessName(String processName);
+
+    boolean existsByProcessName(String processName);
+}

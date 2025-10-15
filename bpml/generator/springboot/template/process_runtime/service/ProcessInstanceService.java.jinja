@@ -1,0 +1,137 @@
+package {{ group_name }}.{{ app_name_lower }}.process.service;
+
+import {{ group_name }}.{{ app_name_lower }}.process.dto.ProcessInstanceDTO;
+import {{ group_name }}.{{ app_name_lower }}.process.model.ProcessInstance;
+import {{ group_name }}.{{ app_name_lower }}.process.repository.ProcessInstanceRepository;
+import {{ group_name }}.{{ app_name_lower }}.exception.NotFoundException;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+
+@Service
+@RequiredArgsConstructor
+@Slf4j
+public class ProcessInstanceService {
+
+    private final ProcessInstanceRepository repository;
+    private final ObjectMapper objectMapper;
+
+    /**
+     * Get process instance by ID
+     */
+    @Transactional(readOnly = true)
+    public ProcessInstanceDTO getById(Long id) {
+        log.info("Fetching process instance with id: {}", id);
+        ProcessInstance instance = repository.findById(id)
+                .orElseThrow(() -> new NotFoundException("Process instance not found with id: " + id));
+        return mapToDTO(instance);
+    }
+
+    /**
+     * Get all process instances with pagination
+     */
+    @Transactional(readOnly = true)
+    public Page<ProcessInstanceDTO> getAll(int pageNo, int pageSize) {
+        log.info("Fetching all process instances - page: {}, size: {}", pageNo, pageSize);
+        Pageable pageable = PageRequest.of(pageNo, pageSize, Sort.by("id").descending());
+        Page<ProcessInstance> instancePage = repository.findAll(pageable);
+        return instancePage.map(this::mapToDTO);
+    }
+
+    /**
+     * Get all process instances without pagination
+     */
+    @Transactional(readOnly = true)
+    public List<ProcessInstanceDTO> getAll() {
+        log.info("Fetching all process instances");
+        List<ProcessInstance> instances = repository.findAll();
+        return instances.stream()
+                .map(this::mapToDTO)
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Get process instances by process name
+     */
+    @Transactional(readOnly = true)
+    public List<ProcessInstanceDTO> getByProcessName(String processName) {
+        log.info("Fetching process instances for process: {}", processName);
+        List<ProcessInstance> instances = repository.findByProcessName(processName);
+        return instances.stream()
+                .map(this::mapToDTO)
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Get process instances by status
+     */
+    @Transactional(readOnly = true)
+    public List<ProcessInstanceDTO> getByStatus(ProcessInstance.ProcessStatus status) {
+        log.info("Fetching process instances with status: {}", status);
+        List<ProcessInstance> instances = repository.findByStatus(status);
+        return instances.stream()
+                .map(this::mapToDTO)
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Get process instances initiated by user
+     */
+    @Transactional(readOnly = true)
+    public List<ProcessInstanceDTO> getByInitiatedBy(String userId) {
+        log.info("Fetching process instances initiated by: {}", userId);
+        List<ProcessInstance> instances = repository.findByInitiatedBy(userId);
+        return instances.stream()
+                .map(this::mapToDTO)
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Get current state of a process instance
+     */
+    @Transactional(readOnly = true)
+    public String getCurrentState(Long id) {
+        log.info("Fetching current state for process instance: {}", id);
+        ProcessInstance instance = repository.findById(id)
+                .orElseThrow(() -> new NotFoundException("Process instance not found with id: " + id));
+        return instance.getCurrentState();
+    }
+
+    private ProcessInstanceDTO mapToDTO(ProcessInstance instance) {
+        return ProcessInstanceDTO.builder()
+                .id(instance.getId())
+                .processName(instance.getProcessName())
+                .currentState(instance.getCurrentState())
+                .status(instance.getStatus())
+                .initiatedBy(instance.getInitiatedBy())
+                .processVariables(parseJson(instance.getProcessVariables()))
+                .startedAt(instance.getStartedAt())
+                .completedAt(instance.getCompletedAt())
+                .terminatedReason(instance.getTerminatedReason())
+                .build();
+    }
+
+    private Map<String, Object> parseJson(String json) {
+        if (json == null || json.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        try {
+            return objectMapper.readValue(json, Map.class);
+        } catch (JsonProcessingException e) {
+            log.error("Failed to parse JSON", e);
+            return Collections.emptyMap();
+        }
+    }
+}

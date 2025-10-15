@@ -1,0 +1,20 @@
+package {{ group_name }}.{{ app_name_lower }}.process.repository;
+
+import {{ group_name }}.{{ app_name_lower }}.process.model.ProcessInstance;
+import {{ group_name }}.{{ app_name_lower }}.process.model.ProcessInstance.ProcessStatus;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
+
+import java.util.List;
+
+@Repository
+public interface ProcessInstanceRepository extends JpaRepository<ProcessInstance, Long> {
+
+    List<ProcessInstance> findByProcessName(String processName);
+
+    List<ProcessInstance> findByStatus(ProcessStatus status);
+
+    List<ProcessInstance> findByInitiatedBy(String initiatedBy);
+
+    List<ProcessInstance> findByProcessNameAndStatus(String processName, ProcessStatus status);
+}

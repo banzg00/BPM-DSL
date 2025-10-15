@@ -1,0 +1,159 @@
+package {{ group_name }}.{{ app_name_lower }}.process.controller;
+
+import {{ group_name }}.{{ app_name_lower }}.process.dto.*;
+import {{ group_name }}.{{ app_name_lower }}.process.model.ProcessInstance.ProcessStatus;
+import {{ group_name }}.{{ app_name_lower }}.process.service.ProcessEngine;
+import {{ group_name }}.{{ app_name_lower }}.process.service.ProcessInstanceService;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+import java.util.Map;
+
+@RestController
+@RequestMapping("/api/processes")
+@RequiredArgsConstructor
+@Slf4j
+@CrossOrigin
+public class ProcessInstanceController {
+
+    private final ProcessEngine processEngine;
+    private final ProcessInstanceService processInstanceService;
+
+    /**
+     * Start a new process instance
+     */
+    @PostMapping("/{processName}/start")
+    public ResponseEntity<ProcessInstanceDTO> startProcess(
+            @PathVariable String processName,
+            @RequestBody StartProcessRequest request) {
+        log.info("POST /api/processes/{}/start - Starting process", processName);
+        ProcessInstanceDTO processInstance = processEngine.startProcess(processName, request);
+        return ResponseEntity.status(HttpStatus.CREATED).body(processInstance);
+    }
+
+    /**
+     * Get process instance by ID
+     */
+    @GetMapping("/instances/{id}")
+    public ResponseEntity<ProcessInstanceDTO> getById(@PathVariable Long id) {
+        log.info("GET /api/processes/instances/{} - Fetching process instance", id);
+        ProcessInstanceDTO dto = processInstanceService.getById(id);
+        return ResponseEntity.ok(dto);
+    }
+
+    /**
+     * Get all process instances with pagination
+     */
+    @GetMapping("/instances/{pageNo}/{pageSize}")
+    public ResponseEntity<Page<ProcessInstanceDTO>> getAll(
+            @PathVariable int pageNo,
+            @PathVariable int pageSize) {
+        log.info("GET /api/processes/instances/{}/{} - Fetching paginated process instances", pageNo, pageSize);
+        Page<ProcessInstanceDTO> page = processInstanceService.getAll(pageNo, pageSize);
+        return ResponseEntity.ok(page);
+    }
+
+    /**
+     * Get all process instances without pagination
+     */
+    @GetMapping("/instances/all")
+    public ResponseEntity<List<ProcessInstanceDTO>> getAll() {
+        log.info("GET /api/processes/instances/all - Fetching all process instances");
+        List<ProcessInstanceDTO> dtos = processInstanceService.getAll();
+        return ResponseEntity.ok(dtos);
+    }
+
+    /**
+     * Get process instances by process name
+     */
+    @GetMapping("/instances/by-name/{processName}")
+    public ResponseEntity<List<ProcessInstanceDTO>> getByProcessName(@PathVariable String processName) {
+        log.info("GET /api/processes/instances/by-name/{} - Fetching process instances", processName);
+        List<ProcessInstanceDTO> dtos = processInstanceService.getByProcessName(processName);
+        return ResponseEntity.ok(dtos);
+    }
+
+    /**
+     * Get process instances by status
+     */
+    @GetMapping("/instances/by-status/{status}")
+    public ResponseEntity<List<ProcessInstanceDTO>> getByStatus(@PathVariable ProcessStatus status) {
+        log.info("GET /api/processes/instances/by-status/{} - Fetching process instances", status);
+        List<ProcessInstanceDTO> dtos = processInstanceService.getByStatus(status);
+        return ResponseEntity.ok(dtos);
+    }
+
+    /**
+     * Get process instances initiated by user
+     */
+    @GetMapping("/instances/by-user/{userId}")
+    public ResponseEntity<List<ProcessInstanceDTO>> getByInitiatedBy(@PathVariable String userId) {
+        log.info("GET /api/processes/instances/by-user/{} - Fetching process instances", userId);
+        List<ProcessInstanceDTO> dtos = processInstanceService.getByInitiatedBy(userId);
+        return ResponseEntity.ok(dtos);
+    }
+
+    /**
+     * Get current state of a process instance
+     */
+    @GetMapping("/instances/{id}/current-state")
+    public ResponseEntity<Map<String, String>> getCurrentState(@PathVariable Long id) {
+        log.info("GET /api/processes/instances/{}/current-state - Fetching current state", id);
+        String currentState = processInstanceService.getCurrentState(id);
+        return ResponseEntity.ok(Map.of("currentState", currentState));
+    }
+
+    /**
+     * Get available transitions for a process instance
+     */
+    @GetMapping("/instances/{id}/transitions")
+    public ResponseEntity<List<AvailableTransitionDTO>> getAvailableTransitions(
+            @PathVariable Long id,
+            @RequestParam(required = false) String userRole) {
+        log.info("GET /api/processes/instances/{}/transitions - Fetching available transitions for role {}",
+                id, userRole);
+        List<AvailableTransitionDTO> transitions = processEngine.getAvailableTransitions(id, userRole);
+        return ResponseEntity.ok(transitions);
+    }
+
+    /**
+     * Execute a transition
+     */
+    @PostMapping("/instances/{id}/transitions/{transitionName}")
+    public ResponseEntity<ProcessInstanceDTO> executeTransition(
+            @PathVariable Long id,
+            @PathVariable String transitionName,
+            @RequestBody ExecuteTransitionRequest request) {
+        log.info("POST /api/processes/instances/{}/transitions/{} - Executing transition", id, transitionName);
+        ProcessInstanceDTO processInstance = processEngine.executeTransition(id, transitionName, request);
+        return ResponseEntity.ok(processInstance);
+    }
+
+    /**
+     * Get process history
+     */
+    @GetMapping("/instances/{id}/history")
+    public ResponseEntity<List<TransitionHistoryDTO>> getProcessHistory(@PathVariable Long id) {
+        log.info("GET /api/processes/instances/{}/history - Fetching process history", id);
+        List<TransitionHistoryDTO> history = processEngine.getProcessHistory(id);
+        return ResponseEntity.ok(history);
+    }
+
+    /**
+     * Terminate a process instance
+     */
+    @DeleteMapping("/instances/{id}/terminate")
+    public ResponseEntity<Void> terminateProcess(
+            @PathVariable Long id,
+            @RequestParam String reason,
+            @RequestParam String userId) {
+        log.info("DELETE /api/processes/instances/{}/terminate - Terminating process by user {}", id, userId);
+        processEngine.terminateProcess(id, reason, userId);
+        return ResponseEntity.noContent().build();
+    }
+}

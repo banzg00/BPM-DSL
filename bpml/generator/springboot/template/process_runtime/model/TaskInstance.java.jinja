@@ -1,0 +1,80 @@
+package {{ group_name }}.{{ app_name_lower }}.process.model;
+
+import jakarta.persistence.*;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+import java.time.LocalDateTime;
+
+/**
+ * Represents a work item/task in a process instance
+ */
+@Entity
+@Table(name = "task_instance")
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class TaskInstance {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @Column(name = "process_instance_id", nullable = false)
+    private Long processInstanceId;
+
+    @Column(name = "task_name", nullable = false)
+    private String taskName;
+
+    @Column(name = "assigned_role")
+    private String assignedRole;
+
+    @Column(name = "assigned_user")
+    private String assignedUser;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status", nullable = false)
+    private TaskStatus status;
+
+    @Column(name = "entity_id")
+    private Long entityId;
+
+    @Column(name = "entity_type")
+    private String entityType;
+
+    @Column(name = "task_data", columnDefinition = "TEXT")
+    private String taskData; // JSON for additional task-specific data
+
+    @Column(name = "created_at", nullable = false)
+    private LocalDateTime createdAt;
+
+    @Column(name = "claimed_at")
+    private LocalDateTime claimedAt;
+
+    @Column(name = "completed_at")
+    private LocalDateTime completedAt;
+
+    @Column(name = "completed_by")
+    private String completedBy;
+
+    @PrePersist
+    protected void onCreate() {
+        if (createdAt == null) {
+            createdAt = LocalDateTime.now();
+        }
+        if (status == null) {
+            status = TaskStatus.PENDING;
+        }
+    }
+
+    public enum TaskStatus {
+        PENDING,
+        IN_PROGRESS,
+        COMPLETED,
+        SKIPPED,
+        CANCELLED
+    }
+}

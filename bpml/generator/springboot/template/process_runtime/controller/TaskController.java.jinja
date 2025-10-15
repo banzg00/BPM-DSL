@@ -1,0 +1,137 @@
+package {{ group_name }}.{{ app_name_lower }}.process.controller;
+
+import {{ group_name }}.{{ app_name_lower }}.process.dto.TaskInstanceDTO;
+import {{ group_name }}.{{ app_name_lower }}.process.model.TaskInstance.TaskStatus;
+import {{ group_name }}.{{ app_name_lower }}.process.service.TaskService;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+import java.util.Map;
+
+@RestController
+@RequestMapping("/api/tasks")
+@RequiredArgsConstructor
+@Slf4j
+@CrossOrigin
+public class TaskController {
+
+    private final TaskService taskService;
+
+    /**
+     * Get task by ID
+     */
+    @GetMapping("/{id}")
+    public ResponseEntity<TaskInstanceDTO> getById(@PathVariable Long id) {
+        log.info("GET /api/tasks/{} - Fetching task", id);
+        TaskInstanceDTO dto = taskService.getById(id);
+        return ResponseEntity.ok(dto);
+    }
+
+    /**
+     * Get all tasks for a process instance
+     */
+    @GetMapping("/process/{processInstanceId}")
+    public ResponseEntity<List<TaskInstanceDTO>> getByProcessInstanceId(@PathVariable Long processInstanceId) {
+        log.info("GET /api/tasks/process/{} - Fetching tasks for process instance", processInstanceId);
+        List<TaskInstanceDTO> tasks = taskService.getByProcessInstanceId(processInstanceId);
+        return ResponseEntity.ok(tasks);
+    }
+
+    /**
+     * Get all tasks assigned to a role
+     */
+    @GetMapping("/role/{role}")
+    public ResponseEntity<List<TaskInstanceDTO>> getByRole(@PathVariable String role) {
+        log.info("GET /api/tasks/role/{} - Fetching tasks for role", role);
+        List<TaskInstanceDTO> tasks = taskService.getByRole(role);
+        return ResponseEntity.ok(tasks);
+    }
+
+    /**
+     * Get pending tasks assigned to a role
+     */
+    @GetMapping("/role/{role}/pending")
+    public ResponseEntity<List<TaskInstanceDTO>> getPendingTasksByRole(@PathVariable String role) {
+        log.info("GET /api/tasks/role/{}/pending - Fetching pending tasks for role", role);
+        List<TaskInstanceDTO> tasks = taskService.getPendingTasksByRole(role);
+        return ResponseEntity.ok(tasks);
+    }
+
+    /**
+     * Get all tasks assigned to a user
+     */
+    @GetMapping("/user/{userId}")
+    public ResponseEntity<List<TaskInstanceDTO>> getByUser(@PathVariable String userId) {
+        log.info("GET /api/tasks/user/{} - Fetching tasks for user", userId);
+        List<TaskInstanceDTO> tasks = taskService.getByUser(userId);
+        return ResponseEntity.ok(tasks);
+    }
+
+    /**
+     * Get pending tasks assigned to a user
+     */
+    @GetMapping("/user/{userId}/pending")
+    public ResponseEntity<List<TaskInstanceDTO>> getPendingTasksByUser(@PathVariable String userId) {
+        log.info("GET /api/tasks/user/{}/pending - Fetching pending tasks for user", userId);
+        List<TaskInstanceDTO> tasks = taskService.getPendingTasksByUser(userId);
+        return ResponseEntity.ok(tasks);
+    }
+
+    /**
+     * Get my tasks (convenience endpoint - would typically use authenticated user)
+     */
+    @GetMapping("/my-tasks")
+    public ResponseEntity<List<TaskInstanceDTO>> getMyTasks(@RequestParam String userId) {
+        log.info("GET /api/tasks/my-tasks - Fetching tasks for authenticated user {}", userId);
+        List<TaskInstanceDTO> tasks = taskService.getByUser(userId);
+        return ResponseEntity.ok(tasks);
+    }
+
+    /**
+     * Get tasks by status
+     */
+    @GetMapping("/status/{status}")
+    public ResponseEntity<List<TaskInstanceDTO>> getByStatus(@PathVariable TaskStatus status) {
+        log.info("GET /api/tasks/status/{} - Fetching tasks with status", status);
+        List<TaskInstanceDTO> tasks = taskService.getByStatus(status);
+        return ResponseEntity.ok(tasks);
+    }
+
+    /**
+     * Claim a task (assign to user)
+     */
+    @PostMapping("/{id}/claim")
+    public ResponseEntity<TaskInstanceDTO> claimTask(
+            @PathVariable Long id,
+            @RequestParam String userId) {
+        log.info("POST /api/tasks/{}/claim - User {} claiming task", id, userId);
+        TaskInstanceDTO task = taskService.claimTask(id, userId);
+        return ResponseEntity.ok(task);
+    }
+
+    /**
+     * Complete a task
+     */
+    @PostMapping("/{id}/complete")
+    public ResponseEntity<TaskInstanceDTO> completeTask(
+            @PathVariable Long id,
+            @RequestParam String userId,
+            @RequestBody(required = false) Map<String, Object> taskData) {
+        log.info("POST /api/tasks/{}/complete - User {} completing task", id, userId);
+        TaskInstanceDTO task = taskService.completeTask(id, userId, taskData);
+        return ResponseEntity.ok(task);
+    }
+
+    /**
+     * Release a task (unassign from user)
+     */
+    @PostMapping("/{id}/release")
+    public ResponseEntity<TaskInstanceDTO> releaseTask(@PathVariable Long id) {
+        log.info("POST /api/tasks/{}/release - Releasing task", id);
+        TaskInstanceDTO task = taskService.releaseTask(id);
+        return ResponseEntity.ok(task);
+    }
+}

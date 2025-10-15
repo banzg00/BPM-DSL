@@ -18,7 +18,8 @@ from bpml.generator.util.string_format_util import (
     lower_first_str,
     snake_case,
     camel_case,
-    upper_case
+    upper_case,
+    dash_case
 )
 
 __version__ = "0.1.0"
@@ -78,9 +79,20 @@ def generate_entity_files(context, filters, main_folder_path, model, overwrite):
     for entity in all_entities:
         context['entity'] = entity
         context['entity_name'] = entity.name
+        context['entity_name_cap'] = capitalize_str(entity.name)
         context['attributes'] = entity.attributes if hasattr(entity, 'attributes') else []
 
-        # Run Jinja generator
+        # Generate enum types for entity attributes
+        for attribute in context['attributes']:
+            if is_enum_type(attribute.type):
+                context['attribute_name_cap'] = capitalize_str(attribute.name)
+                context['enum_values'] = get_enum_values(attribute.type)
+
+                # Generate enum file
+                enum_template = os.path.join(THIS_FOLDER, 'template/content_structure/model/enums')
+                textx_jinja_generator(enum_template, main_folder_path, context, overwrite, filters=filters)
+
+        # Run Jinja generator for entity files
         textx_jinja_generator(content_structure_template, main_folder_path, context, overwrite, filters=filters)
 
 
@@ -146,7 +158,7 @@ def generate_springboot_structure(context, filters, output_path, overwrite):
 def get_filters():
     """Return Jinja2 filters for template rendering"""
     return {
-        'format_type': format_type_java,
+        'format_type_java': format_type_java,
         'is_enum_type': is_enum_type,
         'get_enum_values': get_enum_values,
         'format_template_name': format_template_name,
@@ -154,7 +166,8 @@ def get_filters():
         'lower_first_str': lower_first_str,
         'snake_case': snake_case,
         'camel_case': camel_case,
-        'upper_case': upper_case
+        'upper_case': upper_case,
+        'dash_case': dash_case
     }
 
 

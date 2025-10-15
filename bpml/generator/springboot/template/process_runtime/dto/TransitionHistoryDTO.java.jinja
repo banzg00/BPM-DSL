@@ -1,0 +1,29 @@
+package {{ group_name }}.{{ app_name_lower }}.process.dto;
+
+import com.fasterxml.jackson.annotation.JsonFormat;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+import java.time.LocalDateTime;
+import java.util.Map;
+
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class TransitionHistoryDTO {
+
+    private Long id;
+    private Long processInstanceId;
+    private String transitionName;
+    private String fromState;
+    private String toState;
+    private String performedBy;
+    private String performedByRole;
+    private Map<String, Object> transitionData;
+
+    @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss")
+    private LocalDateTime timestamp;
+}

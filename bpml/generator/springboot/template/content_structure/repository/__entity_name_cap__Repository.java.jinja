@@ -1,0 +1,16 @@
+package {{ group_name }}.{{ app_name_lower }}.repository;
+
+import {{ group_name }}.{{ app_name_lower }}.model.{{ entity_name_cap }};
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
+
+import java.util.List;
+
+@Repository
+public interface {{ entity_name_cap }}Repository extends JpaRepository<{{ entity_name_cap }}, Long> {
+
+    /**
+     * Find all entities associated with a specific process instance
+     */
+    List<{{ entity_name_cap }}> findByProcessInstanceId(Long processInstanceId);
+}

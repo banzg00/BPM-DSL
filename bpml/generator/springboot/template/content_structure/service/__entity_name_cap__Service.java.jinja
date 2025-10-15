@@ -1,0 +1,117 @@
+package {{ group_name }}.{{ app_name_lower }}.service;
+
+import {{ group_name }}.{{ app_name_lower }}.dto.{{ entity_name_cap }}DTO;
+import {{ group_name }}.{{ app_name_lower }}.exception.NotFoundException;
+import {{ group_name }}.{{ app_name_lower }}.mapper.{{ entity_name_cap }}Mapper;
+import {{ group_name }}.{{ app_name_lower }}.model.{{ entity_name_cap }};
+import {{ group_name }}.{{ app_name_lower }}.repository.{{ entity_name_cap }}Repository;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
+
+@Service
+@RequiredArgsConstructor
+@Slf4j
+public class {{ entity_name_cap }}Service {
+
+    private final {{ entity_name_cap }}Repository repository;
+
+    /**
+     * Create a new {{ entity_name_cap }}
+     */
+    @Transactional
+    public {{ entity_name_cap }}DTO create({{ entity_name_cap }}DTO dto) {
+        log.info("Creating new {{ entity_name_cap }}: {}", dto);
+        {{ entity_name_cap }} entity = {{ entity_name_cap }}Mapper.toEntity(dto);
+        {{ entity_name_cap }} savedEntity = repository.save(entity);
+        log.info("Created {{ entity_name_cap }} with id: {}", savedEntity.getId());
+        return {{ entity_name_cap }}Mapper.toDTO(savedEntity);
+    }
+
+    /**
+     * Get {{ entity_name_cap }} by ID
+     */
+    @Transactional(readOnly = true)
+    public {{ entity_name_cap }}DTO getById(Long id) {
+        log.info("Fetching {{ entity_name_cap }} with id: {}", id);
+        {{ entity_name_cap }} entity = repository.findById(id)
+                .orElseThrow(() -> new NotFoundException("{{ entity_name_cap }} not found with id: " + id));
+        return {{ entity_name_cap }}Mapper.toDTO(entity);
+    }
+
+    /**
+     * Get all {{ entity_name_cap }}s with pagination
+     */
+    @Transactional(readOnly = true)
+    public Page<{{ entity_name_cap }}DTO> getAll(int pageNo, int pageSize) {
+        log.info("Fetching all {{ entity_name_cap }}s - page: {}, size: {}", pageNo, pageSize);
+        Pageable pageable = PageRequest.of(pageNo, pageSize, Sort.by("id").descending());
+        Page<{{ entity_name_cap }}> entityPage = repository.findAll(pageable);
+        return entityPage.map({{ entity_name_cap }}Mapper::toDTO);
+    }
+
+    /**
+     * Get all {{ entity_name_cap }}s without pagination
+     */
+    @Transactional(readOnly = true)
+    public List<{{ entity_name_cap }}DTO> getAll() {
+        log.info("Fetching all {{ entity_name_cap }}s");
+        List<{{ entity_name_cap }}> entities = repository.findAll();
+        return {{ entity_name_cap }}Mapper.toDTOs(entities);
+    }
+
+    /**
+     * Get all {{ entity_name_cap }}s associated with a process instance
+     */
+    @Transactional(readOnly = true)
+    public List<{{ entity_name_cap }}DTO> getByProcessInstanceId(Long processInstanceId) {
+        log.info("Fetching {{ entity_name_cap }}s for process instance: {}", processInstanceId);
+        List<{{ entity_name_cap }}> entities = repository.findByProcessInstanceId(processInstanceId);
+        return {{ entity_name_cap }}Mapper.toDTOs(entities);
+    }
+
+    /**
+     * Update an existing {{ entity_name_cap }}
+     */
+    @Transactional
+    public {{ entity_name_cap }}DTO update(Long id, {{ entity_name_cap }}DTO dto) {
+        log.info("Updating {{ entity_name_cap }} with id: {}", id);
+        {{ entity_name_cap }} existingEntity = repository.findById(id)
+                .orElseThrow(() -> new NotFoundException("{{ entity_name_cap }} not found with id: " + id));
+
+{%- if attributes %}
+{%- for attribute in attributes %}
+        existingEntity.set{{ attribute.name | capitalize_str }}(dto.get{{ attribute.name | capitalize_str }}());
+{%- endfor %}
+{%- endif %}
+
+        // Update process tracking if provided
+        if (dto.getProcessInstanceId() != null) {
+            existingEntity.setProcessInstanceId(dto.getProcessInstanceId());
+        }
+
+        {{ entity_name_cap }} updatedEntity = repository.save(existingEntity);
+        log.info("Updated {{ entity_name_cap }} with id: {}", id);
+        return {{ entity_name_cap }}Mapper.toDTO(updatedEntity);
+    }
+
+    /**
+     * Delete {{ entity_name_cap }} by ID
+     */
+    @Transactional
+    public void delete(Long id) {
+        log.info("Deleting {{ entity_name_cap }} with id: {}", id);
+        if (!repository.existsById(id)) {
+            throw new NotFoundException("{{ entity_name_cap }} not found with id: " + id);
+        }
+        repository.deleteById(id);
+        log.info("Deleted {{ entity_name_cap }} with id: {}", id);
+    }
+}

@@ -1,0 +1,62 @@
+package {{ group_name }}.{{ app_name_lower }}.model;
+
+import jakarta.persistence.*;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+{%- if attributes %}
+{%- for attribute in attributes %}
+{%- if attribute.type | is_enum_type %}
+import {{ group_name }}.{{ app_name_lower }}.model.enums.{{ entity_name_cap }}{{ attribute.name | capitalize_str }};
+{%- endif %}
+{%- endfor %}
+{%- endif %}
+
+@Entity
+@Table(name = "{{ entity_name | snake_case }}")
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class {{ entity_name_cap }} {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+{% if attributes %}
+{%- for attribute in attributes %}
+    {%- if attribute.type | is_enum_type %}
+    @Enumerated(EnumType.STRING)
+    @Column(name = "{{ attribute.name | snake_case }}")
+    private {{ entity_name_cap }}{{ attribute.name | capitalize_str }} {{ attribute.name | camel_case }};
+    {%- else %}
+    @Column(name = "{{ attribute.name | snake_case }}")
+    private {{ attribute.type | format_type_java }} {{ attribute.name | camel_case }};
+    {%- endif %}
+{% endfor %}
+{%- endif %}
+    // Process tracking - links entity to process instance if created/modified within a process
+    @Column(name = "process_instance_id")
+    private Long processInstanceId;
+
+    @Column(name = "created_at")
+    private LocalDateTime createdAt;
+
+    @Column(name = "updated_at")
+    private LocalDateTime updatedAt;
+
+    @PrePersist
+    protected void onCreate() {
+        createdAt = LocalDateTime.now();
+        updatedAt = LocalDateTime.now();
+    }
+
+    @PreUpdate
+    protected void onUpdate() {
+        updatedAt = LocalDateTime.now();
+    }
+}

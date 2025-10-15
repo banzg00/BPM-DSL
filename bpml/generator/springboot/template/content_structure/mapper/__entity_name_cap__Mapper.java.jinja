@@ -1,0 +1,64 @@
+package {{ group_name }}.{{ app_name_lower }}.mapper;
+
+import {{ group_name }}.{{ app_name_lower }}.model.{{ entity_name_cap }};
+import {{ group_name }}.{{ app_name_lower }}.dto.{{ entity_name_cap }}DTO;
+
+import java.util.List;
+import java.util.stream.Collectors;
+
+public class {{ entity_name_cap }}Mapper {
+
+    public static {{ entity_name_cap }}DTO toDTO({{ entity_name_cap }} entity) {
+        if (entity == null) {
+            return null;
+        }
+
+        return {{ entity_name_cap }}DTO.builder()
+                .id(entity.getId())
+{%- if attributes %}
+{%- for attribute in attributes %}
+                .{{ attribute.name | camel_case }}(entity.get{{ attribute.name | capitalize_str }}())
+{%- endfor %}
+{%- endif %}
+                .processInstanceId(entity.getProcessInstanceId())
+                .createdAt(entity.getCreatedAt())
+                .updatedAt(entity.getUpdatedAt())
+                .build();
+    }
+
+    public static {{ entity_name_cap }} toEntity({{ entity_name_cap }}DTO dto) {
+        if (dto == null) {
+            return null;
+        }
+
+        return {{ entity_name_cap }}.builder()
+                .id(dto.getId())
+{%- if attributes %}
+{%- for attribute in attributes %}
+                .{{ attribute.name | camel_case }}(dto.get{{ attribute.name | capitalize_str }}())
+{%- endfor %}
+{%- endif %}
+                .processInstanceId(dto.getProcessInstanceId())
+                .createdAt(dto.getCreatedAt())
+                .updatedAt(dto.getUpdatedAt())
+                .build();
+    }
+
+    public static List<{{ entity_name_cap }}DTO> toDTOs(List<{{ entity_name_cap }}> entities) {
+        if (entities == null) {
+            return null;
+        }
+        return entities.stream()
+                .map({{ entity_name_cap }}Mapper::toDTO)
+                .collect(Collectors.toList());
+    }
+
+    public static List<{{ entity_name_cap }}> toEntities(List<{{ entity_name_cap }}DTO> dtos) {
+        if (dtos == null) {
+            return null;
+        }
+        return dtos.stream()
+                .map({{ entity_name_cap }}Mapper::toEntity)
+                .collect(Collectors.toList());
+    }
+}

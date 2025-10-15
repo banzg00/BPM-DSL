@@ -1,0 +1,340 @@
+package {{ group_name }}.{{ app_name_lower }}.process.service;
+
+import {{ group_name }}.{{ app_name_lower }}.process.dto.*;
+import {{ group_name }}.{{ app_name_lower }}.process.model.*;
+import {{ group_name }}.{{ app_name_lower }}.process.repository.*;
+import {{ group_name }}.{{ app_name_lower }}.exception.NotFoundException;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.LocalDateTime;
+import java.util.*;
+import java.util.stream.Collectors;
+
+/**
+ * Core process engine - orchestrates process execution
+ */
+@Service
+@RequiredArgsConstructor
+@Slf4j
+public class ProcessEngine {
+
+    private final ProcessDefinitionRepository processDefinitionRepository;
+    private final ProcessInstanceRepository processInstanceRepository;
+    private final TaskInstanceRepository taskInstanceRepository;
+    private final TransitionHistoryRepository transitionHistoryRepository;
+    private final ObjectMapper objectMapper;
+
+    /**
+     * Start a new process instance
+     */
+    @Transactional
+    public ProcessInstanceDTO startProcess(String processName, StartProcessRequest request) {
+        log.info("Starting process: {} by user: {}", processName, request.getInitiatedBy());
+
+        // Load process definition
+        ProcessDefinition definition = processDefinitionRepository.findByProcessName(processName)
+                .orElseThrow(() -> new NotFoundException("Process definition not found: " + processName));
+
+        // Parse process definition JSON to get initial state
+        Map<String, Object> definitionMap = parseDefinitionJson(definition.getDefinitionJson());
+        String initialState = definition.getInitialState();
+
+        // Create process instance
+        ProcessInstance processInstance = ProcessInstance.builder()
+                .processName(processName)
+                .currentState(initialState)
+                .status(ProcessInstance.ProcessStatus.RUNNING)
+                .initiatedBy(request.getInitiatedBy())
+                .processVariables(serializeToJson(request.getProcessVariables()))
+                .startedAt(LocalDateTime.now())
+                .build();
+
+        ProcessInstance savedInstance = processInstanceRepository.save(processInstance);
+        log.info("Created process instance {} in state {}", savedInstance.getId(), initialState);
+
+        // Create initial tasks for the initial state
+        createTasksForState(savedInstance, initialState, definitionMap);
+
+        return mapToProcessInstanceDTO(savedInstance);
+    }
+
+    /**
+     * Execute a transition
+     */
+    @Transactional
+    public ProcessInstanceDTO executeTransition(Long processInstanceId, String transitionName, ExecuteTransitionRequest request) {
+        log.info("Executing transition {} on process instance {} by user {}",
+                transitionName, processInstanceId, request.getUserId());
+
+        // Load process instance
+        ProcessInstance processInstance = processInstanceRepository.findById(processInstanceId)
+                .orElseThrow(() -> new NotFoundException("Process instance not found: " + processInstanceId));
+
+        if (processInstance.getStatus() != ProcessInstance.ProcessStatus.RUNNING) {
+            throw new IllegalStateException("Cannot execute transition on non-running process. Current status: " + processInstance.getStatus());
+        }
+
+        // Load process definition
+        ProcessDefinition definition = processDefinitionRepository.findByProcessName(processInstance.getProcessName())
+                .orElseThrow(() -> new NotFoundException("Process definition not found: " + processInstance.getProcessName()));
+
+        Map<String, Object> definitionMap = parseDefinitionJson(definition.getDefinitionJson());
+
+        // Find the transition
+        Map<String, Object> transition = findTransition(definitionMap, transitionName);
+        if (transition == null) {
+            throw new NotFoundException("Transition not found: " + transitionName);
+        }
+
+        // Validate transition
+        String fromState = (String) transition.get("fromState");
+        String toState = (String) transition.get("toState");
+        String requiredRole = (String) transition.get("role");
+
+        if (!processInstance.getCurrentState().equals(fromState)) {
+            throw new IllegalStateException(String.format(
+                    "Invalid transition. Process is in state '%s' but transition '%s' requires state '%s'",
+                    processInstance.getCurrentState(), transitionName, fromState));
+        }
+
+        if (requiredRole != null && request.getUserRole() != null && !request.getUserRole().equals(requiredRole)) {
+            throw new IllegalStateException(String.format(
+                    "User role '%s' is not authorized for transition '%s'. Required role: '%s'",
+                    request.getUserRole(), transitionName, requiredRole));
+        }
+
+        // Record transition history
+        TransitionHistory history = TransitionHistory.builder()
+                .processInstanceId(processInstanceId)
+                .transitionName(transitionName)
+                .fromState(fromState)
+                .toState(toState)
+                .performedBy(request.getUserId())
+                .performedByRole(request.getUserRole())
+                .transitionData(serializeToJson(request.getTransitionData()))
+                .timestamp(LocalDateTime.now())
+                .build();
+        transitionHistoryRepository.save(history);
+
+        // Update process state
+        String oldState = processInstance.getCurrentState();
+        processInstance.setCurrentState(toState);
+
+        // Complete tasks associated with the old state
+        completeTasksForState(processInstanceId, oldState, request.getUserId());
+
+        // Check if process has reached a final state
+        List<String> finalStates = getFinalStates(definitionMap);
+        if (finalStates.contains(toState)) {
+            processInstance.setStatus(ProcessInstance.ProcessStatus.COMPLETED);
+            processInstance.setCompletedAt(LocalDateTime.now());
+            log.info("Process instance {} completed in state {}", processInstanceId, toState);
+        }
+
+        ProcessInstance updatedInstance = processInstanceRepository.save(processInstance);
+
+        // Create new tasks for the new state (if not final)
+        if (processInstance.getStatus() == ProcessInstance.ProcessStatus.RUNNING) {
+            createTasksForState(updatedInstance, toState, definitionMap);
+        }
+
+        log.info("Transition {} executed successfully. Process moved from {} to {}",
+                transitionName, fromState, toState);
+
+        return mapToProcessInstanceDTO(updatedInstance);
+    }
+
+    /**
+     * Get available transitions for current state
+     */
+    @Transactional(readOnly = true)
+    public List<AvailableTransitionDTO> getAvailableTransitions(Long processInstanceId, String userRole) {
+        log.info("Getting available transitions for process instance {} with role {}", processInstanceId, userRole);
+
+        ProcessInstance processInstance = processInstanceRepository.findById(processInstanceId)
+                .orElseThrow(() -> new NotFoundException("Process instance not found: " + processInstanceId));
+
+        ProcessDefinition definition = processDefinitionRepository.findByProcessName(processInstance.getProcessName())
+                .orElseThrow(() -> new NotFoundException("Process definition not found: " + processInstance.getProcessName()));
+
+        Map<String, Object> definitionMap = parseDefinitionJson(definition.getDefinitionJson());
+        List<Map<String, Object>> transitions = getTransitions(definitionMap);
+
+        String currentState = processInstance.getCurrentState();
+
+        return transitions.stream()
+                .filter(t -> currentState.equals(t.get("fromState")))
+                .map(t -> {
+                    String requiredRole = (String) t.get("role");
+                    boolean canExecute = userRole == null || requiredRole == null || userRole.equals(requiredRole);
+
+                    return AvailableTransitionDTO.builder()
+                            .transitionName((String) t.get("name"))
+                            .fromState((String) t.get("fromState"))
+                            .toState((String) t.get("toState"))
+                            .requiredRole(requiredRole)
+                            .canExecute(canExecute)
+                            .build();
+                })
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Get process history
+     */
+    @Transactional(readOnly = true)
+    public List<TransitionHistoryDTO> getProcessHistory(Long processInstanceId) {
+        log.info("Getting history for process instance {}", processInstanceId);
+
+        List<TransitionHistory> history = transitionHistoryRepository
+                .findByProcessInstanceIdOrderByTimestampAsc(processInstanceId);
+
+        return history.stream()
+                .map(this::mapToTransitionHistoryDTO)
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Terminate a process instance
+     */
+    @Transactional
+    public void terminateProcess(Long processInstanceId, String reason, String userId) {
+        log.info("Terminating process instance {} by user {}. Reason: {}", processInstanceId, userId, reason);
+
+        ProcessInstance processInstance = processInstanceRepository.findById(processInstanceId)
+                .orElseThrow(() -> new NotFoundException("Process instance not found: " + processInstanceId));
+
+        processInstance.setStatus(ProcessInstance.ProcessStatus.TERMINATED);
+        processInstance.setTerminatedReason(reason);
+        processInstance.setCompletedAt(LocalDateTime.now());
+        processInstanceRepository.save(processInstance);
+
+        // Cancel all pending tasks
+        List<TaskInstance> pendingTasks = taskInstanceRepository
+                .findByProcessInstanceId(processInstanceId);
+        pendingTasks.forEach(task -> {
+            if (task.getStatus() == TaskInstance.TaskStatus.PENDING ||
+                task.getStatus() == TaskInstance.TaskStatus.IN_PROGRESS) {
+                task.setStatus(TaskInstance.TaskStatus.CANCELLED);
+            }
+        });
+        taskInstanceRepository.saveAll(pendingTasks);
+
+        log.info("Process instance {} terminated", processInstanceId);
+    }
+
+    // ===== PRIVATE HELPER METHODS =====
+
+    private void createTasksForState(ProcessInstance processInstance, String state, Map<String, Object> definitionMap) {
+        List<Map<String, Object>> steps = getSteps(definitionMap);
+
+        // Find steps associated with this state (simple heuristic - can be enhanced)
+        steps.forEach(step -> {
+            String stepName = (String) step.get("name");
+            String role = (String) step.get("role");
+            String affectedEntity = (String) step.get("affectedEntity");
+
+            TaskInstance task = TaskInstance.builder()
+                    .processInstanceId(processInstance.getId())
+                    .taskName(stepName)
+                    .assignedRole(role)
+                    .status(TaskInstance.TaskStatus.PENDING)
+                    .entityType(affectedEntity)
+                    .createdAt(LocalDateTime.now())
+                    .build();
+
+            taskInstanceRepository.save(task);
+            log.debug("Created task {} for process instance {} in state {}", stepName, processInstance.getId(), state);
+        });
+    }
+
+    private void completeTasksForState(Long processInstanceId, String state, String userId) {
+        List<TaskInstance> tasks = taskInstanceRepository.findByProcessInstanceId(processInstanceId);
+        tasks.stream()
+                .filter(t -> t.getStatus() == TaskInstance.TaskStatus.PENDING ||
+                            t.getStatus() == TaskInstance.TaskStatus.IN_PROGRESS)
+                .forEach(task -> {
+                    task.setStatus(TaskInstance.TaskStatus.COMPLETED);
+                    task.setCompletedAt(LocalDateTime.now());
+                    task.setCompletedBy(userId);
+                });
+        taskInstanceRepository.saveAll(tasks);
+    }
+
+    private Map<String, Object> findTransition(Map<String, Object> definitionMap, String transitionName) {
+        List<Map<String, Object>> transitions = getTransitions(definitionMap);
+        return transitions.stream()
+                .filter(t -> transitionName.equals(t.get("name")))
+                .findFirst()
+                .orElse(null);
+    }
+
+    @SuppressWarnings("unchecked")
+    private List<Map<String, Object>> getTransitions(Map<String, Object> definitionMap) {
+        return (List<Map<String, Object>>) definitionMap.getOrDefault("transitions", Collections.emptyList());
+    }
+
+    @SuppressWarnings("unchecked")
+    private List<Map<String, Object>> getSteps(Map<String, Object> definitionMap) {
+        return (List<Map<String, Object>>) definitionMap.getOrDefault("steps", Collections.emptyList());
+    }
+
+    @SuppressWarnings("unchecked")
+    private List<String> getFinalStates(Map<String, Object> definitionMap) {
+        return (List<String>) definitionMap.getOrDefault("finalStates", Collections.emptyList());
+    }
+
+    private Map<String, Object> parseDefinitionJson(String json) {
+        try {
+            return objectMapper.readValue(json, Map.class);
+        } catch (JsonProcessingException e) {
+            log.error("Failed to parse process definition JSON", e);
+            return Collections.emptyMap();
+        }
+    }
+
+    private String serializeToJson(Map<String, Object> data) {
+        if (data == null) {
+            return null;
+        }
+        try {
+            return objectMapper.writeValueAsString(data);
+        } catch (JsonProcessingException e) {
+            log.error("Failed to serialize data to JSON", e);
+            return "{}";
+        }
+    }
+
+    private ProcessInstanceDTO mapToProcessInstanceDTO(ProcessInstance instance) {
+        return ProcessInstanceDTO.builder()
+                .id(instance.getId())
+                .processName(instance.getProcessName())
+                .currentState(instance.getCurrentState())
+                .status(instance.getStatus())
+                .initiatedBy(instance.getInitiatedBy())
+                .processVariables(parseDefinitionJson(instance.getProcessVariables()))
+                .startedAt(instance.getStartedAt())
+                .completedAt(instance.getCompletedAt())
+                .terminatedReason(instance.getTerminatedReason())
+                .build();
+    }
+
+    private TransitionHistoryDTO mapToTransitionHistoryDTO(TransitionHistory history) {
+        return TransitionHistoryDTO.builder()
+                .id(history.getId())
+                .processInstanceId(history.getProcessInstanceId())
+                .transitionName(history.getTransitionName())
+                .fromState(history.getFromState())
+                .toState(history.getToState())
+                .performedBy(history.getPerformedBy())
+                .performedByRole(history.getPerformedByRole())
+                .transitionData(parseDefinitionJson(history.getTransitionData()))
+                .timestamp(history.getTimestamp())
+                .build();
+    }
+}

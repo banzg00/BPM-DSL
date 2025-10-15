@@ -1,0 +1,228 @@
+package {{ group_name }}.{{ app_name_lower }}.process.service;
+
+import {{ group_name }}.{{ app_name_lower }}.process.dto.TaskInstanceDTO;
+import {{ group_name }}.{{ app_name_lower }}.process.model.TaskInstance;
+import {{ group_name }}.{{ app_name_lower }}.process.repository.TaskInstanceRepository;
+import {{ group_name }}.{{ app_name_lower }}.exception.NotFoundException;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.LocalDateTime;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+
+@Service
+@RequiredArgsConstructor
+@Slf4j
+public class TaskService {
+
+    private final TaskInstanceRepository repository;
+    private final ObjectMapper objectMapper;
+
+    /**
+     * Get task by ID
+     */
+    @Transactional(readOnly = true)
+    public TaskInstanceDTO getById(Long id) {
+        log.info("Fetching task instance with id: {}", id);
+        TaskInstance task = repository.findById(id)
+                .orElseThrow(() -> new NotFoundException("Task instance not found with id: " + id));
+        return mapToDTO(task);
+    }
+
+    /**
+     * Get all tasks for a process instance
+     */
+    @Transactional(readOnly = true)
+    public List<TaskInstanceDTO> getByProcessInstanceId(Long processInstanceId) {
+        log.info("Fetching tasks for process instance: {}", processInstanceId);
+        List<TaskInstance> tasks = repository.findByProcessInstanceId(processInstanceId);
+        return tasks.stream()
+                .map(this::mapToDTO)
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Get tasks assigned to a specific role
+     */
+    @Transactional(readOnly = true)
+    public List<TaskInstanceDTO> getByRole(String role) {
+        log.info("Fetching tasks for role: {}", role);
+        List<TaskInstance> tasks = repository.findByAssignedRole(role);
+        return tasks.stream()
+                .map(this::mapToDTO)
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Get pending tasks assigned to a specific role
+     */
+    @Transactional(readOnly = true)
+    public List<TaskInstanceDTO> getPendingTasksByRole(String role) {
+        log.info("Fetching pending tasks for role: {}", role);
+        List<TaskInstance> tasks = repository.findByAssignedRoleAndStatus(
+                role, TaskInstance.TaskStatus.PENDING);
+        return tasks.stream()
+                .map(this::mapToDTO)
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Get tasks assigned to a specific user
+     */
+    @Transactional(readOnly = true)
+    public List<TaskInstanceDTO> getByUser(String userId) {
+        log.info("Fetching tasks for user: {}", userId);
+        List<TaskInstance> tasks = repository.findByAssignedUser(userId);
+        return tasks.stream()
+                .map(this::mapToDTO)
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Get pending tasks assigned to a specific user
+     */
+    @Transactional(readOnly = true)
+    public List<TaskInstanceDTO> getPendingTasksByUser(String userId) {
+        log.info("Fetching pending tasks for user: {}", userId);
+        List<TaskInstance> tasks = repository.findByAssignedUserAndStatus(
+                userId, TaskInstance.TaskStatus.PENDING);
+        return tasks.stream()
+                .map(this::mapToDTO)
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Get tasks by status
+     */
+    @Transactional(readOnly = true)
+    public List<TaskInstanceDTO> getByStatus(TaskInstance.TaskStatus status) {
+        log.info("Fetching tasks with status: {}", status);
+        List<TaskInstance> tasks = repository.findByStatus(status);
+        return tasks.stream()
+                .map(this::mapToDTO)
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Claim a task (assign to a specific user)
+     */
+    @Transactional
+    public TaskInstanceDTO claimTask(Long taskId, String userId) {
+        log.info("User {} claiming task {}", userId, taskId);
+        TaskInstance task = repository.findById(taskId)
+                .orElseThrow(() -> new NotFoundException("Task instance not found with id: " + taskId));
+
+        if (task.getStatus() != TaskInstance.TaskStatus.PENDING) {
+            throw new IllegalStateException("Cannot claim task. Current status: " + task.getStatus());
+        }
+
+        task.setAssignedUser(userId);
+        task.setStatus(TaskInstance.TaskStatus.IN_PROGRESS);
+        task.setClaimedAt(LocalDateTime.now());
+
+        TaskInstance savedTask = repository.save(task);
+        log.info("Task {} claimed by user {}", taskId, userId);
+        return mapToDTO(savedTask);
+    }
+
+    /**
+     * Complete a task
+     */
+    @Transactional
+    public TaskInstanceDTO completeTask(Long taskId, String userId, Map<String, Object> taskData) {
+        log.info("User {} completing task {}", userId, taskId);
+        TaskInstance task = repository.findById(taskId)
+                .orElseThrow(() -> new NotFoundException("Task instance not found with id: " + taskId));
+
+        if (task.getStatus() == TaskInstance.TaskStatus.COMPLETED) {
+            throw new IllegalStateException("Task is already completed");
+        }
+
+        if (task.getStatus() == TaskInstance.TaskStatus.CANCELLED) {
+            throw new IllegalStateException("Cannot complete cancelled task");
+        }
+
+        task.setStatus(TaskInstance.TaskStatus.COMPLETED);
+        task.setCompletedAt(LocalDateTime.now());
+        task.setCompletedBy(userId);
+
+        if (taskData != null && !taskData.isEmpty()) {
+            task.setTaskData(serializeToJson(taskData));
+        }
+
+        TaskInstance savedTask = repository.save(task);
+        log.info("Task {} completed by user {}", taskId, userId);
+        return mapToDTO(savedTask);
+    }
+
+    /**
+     * Release a task (unassign from user, back to pending)
+     */
+    @Transactional
+    public TaskInstanceDTO releaseTask(Long taskId) {
+        log.info("Releasing task {}", taskId);
+        TaskInstance task = repository.findById(taskId)
+                .orElseThrow(() -> new NotFoundException("Task instance not found with id: " + taskId));
+
+        if (task.getStatus() != TaskInstance.TaskStatus.IN_PROGRESS) {
+            throw new IllegalStateException("Can only release tasks that are in progress. Current status: " + task.getStatus());
+        }
+
+        task.setAssignedUser(null);
+        task.setStatus(TaskInstance.TaskStatus.PENDING);
+        task.setClaimedAt(null);
+
+        TaskInstance savedTask = repository.save(task);
+        log.info("Task {} released", taskId);
+        return mapToDTO(savedTask);
+    }
+
+    private TaskInstanceDTO mapToDTO(TaskInstance task) {
+        return TaskInstanceDTO.builder()
+                .id(task.getId())
+                .processInstanceId(task.getProcessInstanceId())
+                .taskName(task.getTaskName())
+                .assignedRole(task.getAssignedRole())
+                .assignedUser(task.getAssignedUser())
+                .status(task.getStatus())
+                .entityId(task.getEntityId())
+                .entityType(task.getEntityType())
+                .taskData(parseJson(task.getTaskData()))
+                .createdAt(task.getCreatedAt())
+                .claimedAt(task.getClaimedAt())
+                .completedAt(task.getCompletedAt())
+                .completedBy(task.getCompletedBy())
+                .build();
+    }
+
+    private Map<String, Object> parseJson(String json) {
+        if (json == null || json.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        try {
+            return objectMapper.readValue(json, Map.class);
+        } catch (JsonProcessingException e) {
+            log.error("Failed to parse JSON", e);
+            return Collections.emptyMap();
+        }
+    }
+
+    private String serializeToJson(Map<String, Object> data) {
+        if (data == null) {
+            return null;
+        }
+        try {
+            return objectMapper.writeValueAsString(data);
+        } catch (JsonProcessingException e) {
+            log.error("Failed to serialize data to JSON", e);
+            return "{}";
+        }
+    }
+}

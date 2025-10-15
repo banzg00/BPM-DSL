@@ -1,0 +1,96 @@
+package {{ group_name }}.{{ app_name_lower }}.controller;
+
+import {{ group_name }}.{{ app_name_lower }}.dto.{{ entity_name_cap }}DTO;
+import {{ group_name }}.{{ app_name_lower }}.service.{{ entity_name_cap }}Service;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+
+@RestController
+@RequestMapping("/api/{{ entity_name | dash_case }}")
+@RequiredArgsConstructor
+@Slf4j
+@CrossOrigin
+public class {{ entity_name_cap }}Controller {
+
+    private final {{ entity_name_cap }}Service service;
+
+    /**
+     * Create a new {{ entity_name_cap }}
+     */
+    @PostMapping("/create")
+    public ResponseEntity<{{ entity_name_cap }}DTO> create(@RequestBody {{ entity_name_cap }}DTO dto) {
+        log.info("POST /api/{{ entity_name | dash_case }}/create - Creating {{ entity_name_cap }}");
+        {{ entity_name_cap }}DTO created = service.create(dto);
+        return ResponseEntity.status(HttpStatus.CREATED).body(created);
+    }
+
+    /**
+     * Get {{ entity_name_cap }} by ID
+     */
+    @GetMapping("/{id}")
+    public ResponseEntity<{{ entity_name_cap }}DTO> getById(@PathVariable Long id) {
+        log.info("GET /api/{{ entity_name | dash_case }}/{} - Fetching {{ entity_name_cap }}", id);
+        {{ entity_name_cap }}DTO dto = service.getById(id);
+        return ResponseEntity.ok(dto);
+    }
+
+    /**
+     * Get all {{ entity_name_cap }}s with pagination
+     */
+    @GetMapping("/{pageNo}/{pageSize}")
+    public ResponseEntity<Page<{{ entity_name_cap }}DTO>> getAll(
+            @PathVariable int pageNo,
+            @PathVariable int pageSize) {
+        log.info("GET /api/{{ entity_name | dash_case }}/{}/{} - Fetching paginated {{ entity_name_cap }}s", pageNo, pageSize);
+        Page<{{ entity_name_cap }}DTO> page = service.getAll(pageNo, pageSize);
+        return ResponseEntity.ok(page);
+    }
+
+    /**
+     * Get all {{ entity_name_cap }}s without pagination
+     */
+    @GetMapping("/all")
+    public ResponseEntity<List<{{ entity_name_cap }}DTO>> getAll() {
+        log.info("GET /api/{{ entity_name | dash_case }}/all - Fetching all {{ entity_name_cap }}s");
+        List<{{ entity_name_cap }}DTO> dtos = service.getAll();
+        return ResponseEntity.ok(dtos);
+    }
+
+    /**
+     * Get all {{ entity_name_cap }}s for a specific process instance
+     */
+    @GetMapping("/process/{processInstanceId}")
+    public ResponseEntity<List<{{ entity_name_cap }}DTO>> getByProcessInstanceId(@PathVariable Long processInstanceId) {
+        log.info("GET /api/{{ entity_name | dash_case }}/process/{} - Fetching {{ entity_name_cap }}s for process instance", processInstanceId);
+        List<{{ entity_name_cap }}DTO> dtos = service.getByProcessInstanceId(processInstanceId);
+        return ResponseEntity.ok(dtos);
+    }
+
+    /**
+     * Update an existing {{ entity_name_cap }}
+     */
+    @PutMapping("/update/{id}")
+    public ResponseEntity<{{ entity_name_cap }}DTO> update(
+            @PathVariable Long id,
+            @RequestBody {{ entity_name_cap }}DTO dto) {
+        log.info("PUT /api/{{ entity_name | dash_case }}/update/{} - Updating {{ entity_name_cap }}", id);
+        {{ entity_name_cap }}DTO updated = service.update(id, dto);
+        return ResponseEntity.ok(updated);
+    }
+
+    /**
+     * Delete {{ entity_name_cap }} by ID
+     */
+    @DeleteMapping("/delete/{id}")
+    public ResponseEntity<Void> delete(@PathVariable Long id) {
+        log.info("DELETE /api/{{ entity_name | dash_case }}/delete/{} - Deleting {{ entity_name_cap }}", id);
+        service.delete(id);
+        return ResponseEntity.noContent().build();
+    }
+}
