@@ -1,7 +1,8 @@
 package {{ group_name }}.{{ app_name_lower }}.model.enums;
 
 public enum {{ entity_name_cap }}{{ attribute_name_cap }} {
-{% for value in enum_values %}
-    {{ value | upper_case }}{% if not loop.last %},{% endif %}
-{% endfor %}
+    {% for value in enum_values %}
+    {{ value }}{% if not loop.last %},
+    {% endif %}{% endfor %}
+
 }
