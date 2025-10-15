@@ -4,17 +4,6 @@ These classes extend the basic TextX generated model with additional functionali
 """
 
 
-class SimpleType:
-    """Simple type representation for attributes"""
-
-    def __init__(self, parent, name):
-        self.parent = parent
-        self.name = name
-
-    def __str__(self):
-        return self.name
-
-
 class DataType:
     """Data type wrapper for handling complex type references"""
 
