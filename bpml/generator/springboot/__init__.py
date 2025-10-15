@@ -89,7 +89,7 @@ def generate_entity_files(context, filters, main_folder_path, model, overwrite):
                 context['enum_values'] = get_enum_values(attribute.type)
 
                 # Generate enum file
-                enum_template = os.path.join(THIS_FOLDER, 'template/content_structure/model/enums')
+                enum_template = os.path.join(THIS_FOLDER, 'template/enum_files')
                 textx_jinja_generator(enum_template, main_folder_path, context, overwrite, filters=filters)
 
         # Run Jinja generator for entity files

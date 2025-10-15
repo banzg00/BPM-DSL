@@ -15,11 +15,11 @@ public class {{ entity_name_cap }}Mapper {
 
         return {{ entity_name_cap }}DTO.builder()
                 .id(entity.getId())
-{%- if attributes %}
-{%- for attribute in attributes %}
-                .{{ attribute.name | camel_case }}(entity.get{{ attribute.name | capitalize_str }}())
-{%- endfor %}
-{%- endif %}
+{% if attributes %}
+{% for attribute in attributes %}
+                .{{ attribute.name }}(entity.get{{ attribute.name | capitalize_str }}())
+{% endfor %}
+{% endif %}
                 .processInstanceId(entity.getProcessInstanceId())
                 .createdAt(entity.getCreatedAt())
                 .updatedAt(entity.getUpdatedAt())
@@ -33,11 +33,11 @@ public class {{ entity_name_cap }}Mapper {
 
         return {{ entity_name_cap }}.builder()
                 .id(dto.getId())
-{%- if attributes %}
-{%- for attribute in attributes %}
-                .{{ attribute.name | camel_case }}(dto.get{{ attribute.name | capitalize_str }}())
-{%- endfor %}
-{%- endif %}
+{% if attributes %}
+{% for attribute in attributes %}
+                .{{ attribute.name }}(dto.get{{ attribute.name | capitalize_str }}())
+{% endfor %}
+{% endif %}
                 .processInstanceId(dto.getProcessInstanceId())
                 .createdAt(dto.getCreatedAt())
                 .updatedAt(dto.getUpdatedAt())

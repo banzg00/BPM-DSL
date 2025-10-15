@@ -85,12 +85,11 @@ public class {{ entity_name_cap }}Service {
         log.info("Updating {{ entity_name_cap }} with id: {}", id);
         {{ entity_name_cap }} existingEntity = repository.findById(id)
                 .orElseThrow(() -> new NotFoundException("{{ entity_name_cap }} not found with id: " + id));
-
-{%- if attributes %}
-{%- for attribute in attributes %}
+{% if attributes %}
+{% for attribute in attributes %}
         existingEntity.set{{ attribute.name | capitalize_str }}(dto.get{{ attribute.name | capitalize_str }}());
-{%- endfor %}
-{%- endif %}
+{% endfor %}
+{% endif %}
 
         // Update process tracking if provided
         if (dto.getProcessInstanceId() != null) {
