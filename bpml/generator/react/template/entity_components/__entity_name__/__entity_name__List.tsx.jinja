@@ -59,9 +59,14 @@ const {{ entity_name }}List: React.FC = () => {
         <Typography variant="h4" component="h1">
           {{ entity_name }} List
         </Typography>
-        <Button variant="contained" color="primary" onClick={handleAddNew}>
-          Add New {{ entity_name }}
-        </Button>
+        <Box>
+          <Button onClick={handleBack} sx={{  mr: 1  }}>
+            Back
+          </Button>
+          <Button variant="contained" color="primary" onClick={handleAddNew}>
+            Add New {{ entity_name }}
+          </Button>
+        </Box>
       </Box>
 
       <TableContainer component={Paper}>
