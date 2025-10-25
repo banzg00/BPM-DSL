@@ -60,7 +60,7 @@ const {{ entity_name }}List: React.FC = () => {
           {{ entity_name }} List
         </Typography>
         <Box>
-          <Button onClick={handleBack} sx={{ "{{" }}  mr: 1  {{ "}}" }}>
+          <Button onClick={() => navigate('/')} sx={{ "{{" }}  mr: 1  {{ "}}" }}>
             Back
           </Button>
           <Button variant="contained" color="primary" onClick={handleAddNew}>
