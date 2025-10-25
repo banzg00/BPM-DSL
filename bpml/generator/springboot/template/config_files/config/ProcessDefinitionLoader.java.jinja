@@ -1,0 +1,138 @@
+package {{ group_name }}.{{ app_name_lower }}.config;
+
+import {{ group_name }}.{{ app_name_lower }}.model.ProcessDefinition;
+import {{ group_name }}.{{ app_name_lower }}.repository.ProcessDefinitionRepository;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.CommandLineRunner;
+import org.springframework.stereotype.Component;
+
+import java.time.LocalDateTime;
+import java.util.*;
+
+/**
+ * Loads process definitions into the database at application startup
+ */
+@Component
+@RequiredArgsConstructor
+@Slf4j
+public class ProcessDefinitionLoader implements CommandLineRunner {
+
+    private final ProcessDefinitionRepository processDefinitionRepository;
+    private final ObjectMapper objectMapper;
+
+    @Override
+    public void run(String... args) throws Exception {
+        log.info("Loading process definitions...");
+
+        {% for process in processes %}
+        loadProcessDefinition_{{ process.name }}();
+        {% endfor %}
+
+        log.info("Process definitions loaded successfully");
+    }
+
+    {% for process in processes %}
+    private void loadProcessDefinition_{{ process.name }}() {
+        String processName = "{{ process.name }}";
+
+        // Check if already exists
+        if (processDefinitionRepository.findByProcessName(processName).isPresent()) {
+            log.info("Process definition '{}' already exists, skipping...", processName);
+            return;
+        }
+
+        try {
+            // Build process definition JSON
+            Map<String, Object> definition = new HashMap<>();
+
+            // States
+            List<Map<String, String>> states = new ArrayList<>();
+            {% for elem in process.elements %}
+            {% if elem.__class__.__name__ == 'State' %}
+            states.add(Map.of("name", "{{ elem.name }}", "type", "{{ elem.type if elem.type else 'ACTIVE' }}"));
+            {% endif %}
+            {% endfor %}
+            definition.put("states", states);
+
+            // Roles
+            List<Map<String, String>> roles = new ArrayList<>();
+            {% for elem in process.elements %}
+            {% if elem.__class__.__name__ == 'Role' %}
+            roles.add(Map.of("name", "{{ elem.name }}"));
+            {% endif %}
+            {% endfor %}
+            definition.put("roles", roles);
+
+            // Transitions
+            List<Map<String, Object>> transitions = new ArrayList<>();
+            {% for elem in process.elements %}
+            {% if elem.__class__.__name__ == 'Transition' %}
+            Map<String, Object> transition{{ loop.index }} = new HashMap<>();
+            transition{{ loop.index }}.put("name", "{{ elem.name }}");
+            transition{{ loop.index }}.put("from", "{{ elem.from_state.name }}");
+            transition{{ loop.index }}.put("to", "{{ elem.to_state.name }}");
+            {% if elem.role %}
+            transition{{ loop.index }}.put("role", "{{ elem.role.name }}");
+            {% endif %}
+            {% if elem.auto %}
+            transition{{ loop.index }}.put("auto", true);
+            {% endif %}
+            transitions.add(transition{{ loop.index }});
+            {% endif %}
+            {% endfor %}
+            definition.put("transitions", transitions);
+
+            // Steps (tasks)
+            List<Map<String, Object>> steps = new ArrayList<>();
+            {% for elem in process.elements %}
+            {% if elem.__class__.__name__ == 'Step' %}
+            Map<String, Object> step{{ loop.index }} = new HashMap<>();
+            step{{ loop.index }}.put("name", "{{ elem.name }}");
+            {% if elem.role %}
+            step{{ loop.index }}.put("role", "{{ elem.role.name }}");
+            {% endif %}
+            {% if elem.entity %}
+            step{{ loop.index }}.put("entity", "{{ elem.entity.name }}");
+            {% endif %}
+            {% if elem.operation %}
+            step{{ loop.index }}.put("operation", "{{ elem.operation }}");
+            {% endif %}
+            steps.add(step{{ loop.index }});
+            {% endif %}
+            {% endfor %}
+            definition.put("steps", steps);
+
+            // Convert to JSON
+            String definitionJson = objectMapper.writeValueAsString(definition);
+
+            // Find initial state (first state or START state)
+            {% set initial_state_found = namespace(value=false, name='START') %}
+            {% for elem in process.elements %}
+            {% if elem.__class__.__name__ == 'State' and not initial_state_found.value %}
+            {% set initial_state_found.value = true %}
+            {% set initial_state_found.name = elem.name %}
+            {% endif %}
+            {% endfor %}
+            String initialState = "{{ initial_state_found.name }}";
+
+            // Create and save process definition
+            ProcessDefinition processDefinition = ProcessDefinition.builder()
+                    .processName(processName)
+                    .version("1.0")
+                    .description("{{ process.name }} process definition")
+                    .definitionJson(definitionJson)
+                    .initialState(initialState)
+                    .createdAt(LocalDateTime.now())
+                    .build();
+
+            processDefinitionRepository.save(processDefinition);
+            log.info("Loaded process definition: {}", processName);
+
+        } catch (Exception e) {
+            log.error("Failed to load process definition: {}", processName, e);
+        }
+    }
+    {% endfor %}
+}

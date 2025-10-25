@@ -42,13 +42,15 @@ const StartProcessDialog: React.FC<StartProcessDialogProps> = ({ processName, on
       <DialogContent>
         <TextField
           label="Initiated By (User ID)"
+          placeholder="Enter your user ID (e.g., admin, user1)"
           value={initiatedBy}
           onChange={(e) => setInitiatedBy(e.target.value)}
           fullWidth
           required
           margin="normal"
+          autoFocus
           error={!!error && !initiatedBy}
-          helperText={!!error && !initiatedBy ? 'User ID is required' : ''}
+          helperText={!!error && !initiatedBy ? 'User ID is required' : 'Enter the ID of the user starting this process'}
         />
 
         {error && (
