@@ -1,0 +1,111 @@
+import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import {
+  Container,
+  Typography,
+  Button,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Paper,
+  Chip,
+  Box
+} from '@mui/material';
+import ProcessInstanceService from '../../../services/ProcessInstanceService';
+import { ProcessInstance, ProcessStatus } from '../../../types/types';
+
+const ProcessInstanceList: React.FC = () => {
+  const [instances, setInstances] = useState<ProcessInstance[]>([]);
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const loadData = () => {
+    ProcessInstanceService.getByProcessName('{{ process_name }}').then((data) => {
+      setInstances(data);
+    });
+  };
+
+  const getStatusColor = (status: ProcessStatus) => {
+    switch (status) {
+      case ProcessStatus.RUNNING:
+        return 'primary';
+      case ProcessStatus.COMPLETED:
+        return 'success';
+      case ProcessStatus.TERMINATED:
+        return 'error';
+      case ProcessStatus.SUSPENDED:
+        return 'warning';
+      default:
+        return 'default';
+    }
+  };
+
+  const handleRowClick = (id: number) => {
+    navigate(`/process/{{ process_name_lower }}/instances/${id}`);
+  };
+
+  const handleBack = () => {
+    navigate('/process/{{ process_name_lower }}');
+  };
+
+  return (
+    <Container maxWidth="lg" sx={{ "{{" }}  mt: 4  {{ "}}" }}>
+      <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
+        <Typography variant="h4" component="h1">
+          {{ process_name }} Process Instances
+        </Typography>
+        <Button onClick={handleBack}>
+          Back to Dashboard
+        </Button>
+      </Box>
+
+      <TableContainer component={Paper}>
+        <Table>
+          <TableHead>
+            <TableRow>
+              <TableCell>ID</TableCell>
+              <TableCell>Current State</TableCell>
+              <TableCell>Status</TableCell>
+              <TableCell>Initiated By</TableCell>
+              <TableCell>Started At</TableCell>
+              <TableCell>Completed At</TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {instances.map((instance) => (
+              <TableRow
+                key={instance.id}
+                hover
+                onClick={() => handleRowClick(instance.id)}
+                sx={{ "{{" }}  cursor: 'pointer'  {{ "}}" }}
+              >
+                <TableCell>{instance.id}</TableCell>
+                <TableCell>{instance.currentState}</TableCell>
+                <TableCell>
+                  <Chip
+                    label={instance.status}
+                    color={getStatusColor(instance.status)}
+                    size="small"
+                  />
+                </TableCell>
+                <TableCell>{instance.initiatedBy}</TableCell>
+                <TableCell>{new Date(instance.startedAt).toLocaleString()}</TableCell>
+                <TableCell>
+                  {instance.completedAt ? new Date(instance.completedAt).toLocaleString() : '-'}
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </TableContainer>
+    </Container>
+  );
+};
+
+export default ProcessInstanceList;

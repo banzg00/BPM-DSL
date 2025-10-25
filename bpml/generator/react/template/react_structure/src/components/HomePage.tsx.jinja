@@ -1,0 +1,72 @@
+import React from 'react';
+import { Link } from 'react-router-dom';
+import { Container, Typography, Card, CardContent, Grid, Button } from '@mui/material';
+
+const HomePage: React.FC = () => {
+  return (
+    <Container maxWidth="lg" sx={{ "{{" }}   mt: 4  {{ "}}" }}>
+      <Typography variant="h3" component="h1" gutterBottom>
+        {{ app_name }}
+      </Typography>
+      <Typography variant="subtitle1" gutterBottom>
+        Business Process Management System
+      </Typography>
+
+      <Grid container spacing={3} sx={{ "{{" }}  mt: 2  {{ "}}" }}>
+        {/* Processes Section */}
+        <Grid item xs={12}>
+          <Typography variant="h5" gutterBottom>
+            Processes
+          </Typography>
+        </Grid>
+        {% for process in processes %}
+        <Grid item xs={12} md={6} lg={4}>
+          <Card>
+            <CardContent>
+              <Typography variant="h6" component="h2">
+                {{ process.name }}
+              </Typography>
+              <Button
+                component={Link}
+                to="/process/{{ process.name | lower }}"
+                variant="contained"
+                sx={{ "{{" }}  mt: 2  {{ "}}" }}
+              >
+                Open Dashboard
+              </Button>
+            </CardContent>
+          </Card>
+        </Grid>
+        {% endfor %}
+
+        {/* Entities Section */}
+        <Grid item xs={12} sx={{ "{{" }}  mt: 4  {{ "}}" }}>
+          <Typography variant="h5" gutterBottom>
+            Entities
+          </Typography>
+        </Grid>
+        {% for entity in entities %}
+        <Grid item xs={12} md={6} lg={4}>
+          <Card>
+            <CardContent>
+              <Typography variant="h6" component="h2">
+                {{ entity.name }}
+              </Typography>
+              <Button
+                component={Link}
+                to="/{{ entity.name | lower }}"
+                variant="outlined"
+                sx={{ "{{" }}  mt: 2  {{ "}}" }}
+              >
+                View All
+              </Button>
+            </CardContent>
+          </Card>
+        </Grid>
+        {% endfor %}
+      </Grid>
+    </Container>
+  );
+};
+
+export default HomePage;

@@ -1,0 +1,71 @@
+import React, { useEffect, useState } from 'react';
+import {
+  Timeline,
+  TimelineItem,
+  TimelineSeparator,
+  TimelineConnector,
+  TimelineContent,
+  TimelineDot,
+  TimelineOppositeContent
+} from '@mui/lab';
+import { Typography, Paper } from '@mui/material';
+import ProcessInstanceService from '../../services/ProcessInstanceService';
+import { TransitionHistory } from '../../types/types';
+
+interface ProcessTimelineProps {
+  processInstanceId: number;
+}
+
+const ProcessTimeline: React.FC<ProcessTimelineProps> = ({ processInstanceId }) => {
+  const [history, setHistory] = useState<TransitionHistory[]>([]);
+
+  useEffect(() => {
+    ProcessInstanceService.getProcessHistory(processInstanceId).then((data) => {
+      setHistory(data);
+    });
+  }, [processInstanceId]);
+
+  if (history.length === 0) {
+    return (
+      <Typography variant="body2" color="text.secondary">
+        No history available
+      </Typography>
+    );
+  }
+
+  return (
+    <Timeline position="alternate">
+      {history.map((item, index) => (
+        <TimelineItem key={item.id}>
+          <TimelineOppositeContent color="text.secondary">
+            {new Date(item.executedAt).toLocaleString()}
+          </TimelineOppositeContent>
+          <TimelineSeparator>
+            <TimelineDot color="primary" />
+            {index < history.length - 1 && <TimelineConnector />}
+          </TimelineSeparator>
+          <TimelineContent>
+            <Paper elevation={3} sx={{ "{{" }}  p: 2  {{ "}}" }}>
+              <Typography variant="h6" component="h3">
+                {item.transitionName}
+              </Typography>
+              <Typography variant="body2">
+                {item.fromState} -&gt; {item.toState}
+              </Typography>
+              <Typography variant="caption" color="text.secondary">
+                By: {item.executedBy}
+              </Typography>
+              {item.comments && (
+                <Typography variant="body2" sx={{ "{{" }}  mt: 1  {{ "}}" }}>
+                  {item.comments}
+                </Typography>
+              )}
+            </Paper>
+          </TimelineContent>
+        </TimelineItem>
+      ))}
+    </Timeline>
+  );
+};
+
+export default ProcessTimeline;

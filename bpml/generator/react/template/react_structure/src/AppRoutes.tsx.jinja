@@ -1,0 +1,43 @@
+import React from 'react';
+import { BrowserRouter as Router, Route, Routes, Navigate } from 'react-router-dom';
+import HomePage from './components/HomePage';
+
+{% for entity in entities %}
+import {{ entity.name }}Page from './pages/{{ entity.name }}/{{ entity.name }}Page';
+import {{ entity.name }}List from './pages/{{ entity.name }}/{{ entity.name }}List';
+{% endfor %}
+
+{% for process in processes %}
+import {{ process.name }}Dashboard from './components/processes/{{ process.name }}/{{ process.name }}Dashboard';
+import {{ process.name }}ProcessInstanceList from './components/processes/{{ process.name }}/ProcessInstanceList';
+import {{ process.name }}ProcessInstancePage from './components/processes/{{ process.name }}/ProcessInstancePage';
+import {{ process.name }}TaskList from './components/processes/{{ process.name }}/TaskList';
+{% endfor %}
+
+const AppRoutes: React.FC = () => {
+  return (
+    <Router>
+      <Routes>
+        <Route path="/" element={<HomePage />} />
+
+        {/* Entity routes */}
+        {% for entity in entities %}
+        <Route path="/{{ entity.name | lower }}/:id" element={<{{ entity.name }}Page />} />
+        <Route path="/{{ entity.name | lower }}" element={<{{ entity.name }}List />} />
+        {% endfor %}
+
+        {/* Process routes */}
+        {% for process in processes %}
+        <Route path="/process/{{ process.name | lower }}" element={<{{ process.name }}Dashboard />} />
+        <Route path="/process/{{ process.name | lower }}/instances" element={<{{ process.name }}ProcessInstanceList />} />
+        <Route path="/process/{{ process.name | lower }}/instances/:id" element={<{{ process.name }}ProcessInstancePage />} />
+        <Route path="/process/{{ process.name | lower }}/tasks" element={<{{ process.name }}TaskList />} />
+        {% endfor %}
+
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </Router>
+  );
+};
+
+export default AppRoutes;

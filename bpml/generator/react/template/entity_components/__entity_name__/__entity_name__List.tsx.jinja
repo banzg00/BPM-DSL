@@ -1,0 +1,119 @@
+import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import {
+  Container,
+  Typography,
+  Button,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Paper,
+  Dialog,
+  Box
+} from '@mui/material';
+import {{ entity_name }}Service from '../../services/{{ entity_name }}Service';
+import {{ entity_name }}Dialog from './{{ entity_name }}Dialog';
+import { {{ entity_name }} } from '../../types/types';
+
+const {{ entity_name }}List: React.FC = () => {
+  const [{{ entity_name_lower }}List, set{{ entity_name }}List] = useState<{{ entity_name }}[]>([]);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [selectedId, setSelectedId] = useState<number | undefined>(undefined);
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const loadData = () => {
+    {{ entity_name }}Service.getAll{{ entity_name }}().then((response) => {
+      set{{ entity_name }}List(response);
+    });
+  };
+
+  const handleAddNew = () => {
+    setSelectedId(undefined);
+    setIsDialogOpen(true);
+  };
+
+  const handleEdit = (id: number) => {
+    setSelectedId(id);
+    setIsDialogOpen(true);
+  };
+
+  const handleDialogClose = () => {
+    setIsDialogOpen(false);
+    loadData();
+  };
+
+  const handleRowClick = (id: number) => {
+    navigate(`/{{ entity_name_lower }}/${id}`);
+  };
+
+  return (
+    <Container maxWidth="lg" sx={{ "{{" }}  mt: 4  {{ "}}" }}>
+      <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
+        <Typography variant="h4" component="h1">
+          {{ entity_name }} List
+        </Typography>
+        <Button variant="contained" color="primary" onClick={handleAddNew}>
+          Add New {{ entity_name }}
+        </Button>
+      </Box>
+
+      <TableContainer component={Paper}>
+        <Table>
+          <TableHead>
+            <TableRow>
+              <TableCell>ID</TableCell>
+              {% for attr in attributes %}
+              <TableCell>{{ attr.name | capitalize_str }}</TableCell>
+              {% endfor %}
+              <TableCell>Actions</TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {{'{'}}{{ entity_name_lower }}List.map(({{ entity_name_lower }}) => (
+              <TableRow
+                key={{'{'}}{{ entity_name_lower }}.id{{'}'}}
+                hover
+                onClick={() => handleRowClick({{ entity_name_lower }}.id!)}
+                sx={{ "{{" }}  cursor: 'pointer'  {{ "}}" }}
+              >
+                <TableCell>{{'{'}}{{ entity_name_lower }}.id{{'}'}}</TableCell>
+                {% for attr in attributes %}
+                <TableCell>
+                  {% if attr.type | is_enum_type %}{{'{'}}{{ entity_name_lower }}.{{ attr.name }}{{'}'}}
+                  {% else %}{{'{'}}{{ entity_name_lower }}.{{ attr.name }}?.toString(){{'}'}}
+                  {% endif %}
+                </TableCell>
+                {% endfor %}
+                <TableCell>
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleEdit({{ entity_name_lower }}.id!);
+                    }}
+                  >
+                    Edit
+                  </Button>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </TableContainer>
+
+      <Dialog open={isDialogOpen} onClose={handleDialogClose} maxWidth="sm" fullWidth>
+        <{{ entity_name }}Dialog id={selectedId} onClose={handleDialogClose} />
+      </Dialog>
+    </Container>
+  );
+};
+
+export default {{ entity_name }}List;

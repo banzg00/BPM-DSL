@@ -1,0 +1,200 @@
+import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import {
+  Container,
+  Typography,
+  Button,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Paper,
+  Chip,
+  Box,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem
+} from '@mui/material';
+import TaskService from '../../../services/TaskService';
+import { TaskInstance, TaskStatus } from '../../../types/types';
+
+const TaskList: React.FC = () => {
+  const [tasks, setTasks] = useState<TaskInstance[]>([]);
+  const [filterStatus, setFilterStatus] = useState<string>('all');
+  const [filterRole, setFilterRole] = useState<string>('all');
+  const navigate = useNavigate();
+
+  const roles = [{% for role in process_roles %}'{{ role.name }}'{% if not loop.last %}, {% endif %}{% endfor %}];
+
+  useEffect(() => {
+    loadData();
+  }, [filterStatus, filterRole]);
+
+  const loadData = () => {
+    if (filterStatus !== 'all') {
+      TaskService.getByStatus(filterStatus).then((data) => {
+        setTasks(data.filter(t => filterRole === 'all' || t.assignedRole === filterRole));
+      });
+    } else if (filterRole !== 'all') {
+      TaskService.getByRole(filterRole).then((data) => {
+        setTasks(data);
+      });
+    } else {
+      TaskService.getAll().then((data) => {
+        setTasks(data);
+      });
+    }
+  };
+
+  const getStatusColor = (status: TaskStatus) => {
+    switch (status) {
+      case TaskStatus.PENDING:
+        return 'warning';
+      case TaskStatus.CLAIMED:
+        return 'info';
+      case TaskStatus.COMPLETED:
+        return 'success';
+      case TaskStatus.CANCELLED:
+        return 'error';
+      default:
+        return 'default';
+    }
+  };
+
+  const handleClaimTask = (taskId: number, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const userId = prompt('Enter your user ID:');
+    if (userId) {
+      TaskService.claimTask(taskId, userId).then(() => {
+        loadData();
+      });
+    }
+  };
+
+  const handleCompleteTask = (taskId: number, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const userId = prompt('Enter your user ID:');
+    if (userId) {
+      TaskService.completeTask(taskId, userId).then(() => {
+        loadData();
+      });
+    }
+  };
+
+  const handleRowClick = (processInstanceId: number) => {
+    navigate(`/process/{{ process_name_lower }}/instances/${processInstanceId}`);
+  };
+
+  const handleBack = () => {
+    navigate('/process/{{ process_name_lower }}');
+  };
+
+  return (
+    <Container maxWidth="lg" sx={{ "{{" }}  mt: 4  {{ "}}" }}>
+      <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
+        <Typography variant="h4" component="h1">
+          {{ process_name }} Tasks
+        </Typography>
+        <Button onClick={handleBack}>
+          Back to Dashboard
+        </Button>
+      </Box>
+
+      {/* Filters */}
+      <Box display="flex" gap={2} mb={3}>
+        <FormControl sx={{ "{{" }}  minWidth: 200  {{ "}}" }}>
+          <InputLabel>Status</InputLabel>
+          <Select
+            value={filterStatus}
+            label="Status"
+            onChange={(e) => setFilterStatus(e.target.value)}
+          >
+            <MenuItem value="all">All</MenuItem>
+            <MenuItem value={TaskStatus.PENDING}>Pending</MenuItem>
+            <MenuItem value={TaskStatus.CLAIMED}>Claimed</MenuItem>
+            <MenuItem value={TaskStatus.COMPLETED}>Completed</MenuItem>
+            <MenuItem value={TaskStatus.CANCELLED}>Cancelled</MenuItem>
+          </Select>
+        </FormControl>
+
+        <FormControl sx={{ "{{" }}  minWidth: 200  {{ "}}" }}>
+          <InputLabel>Role</InputLabel>
+          <Select
+            value={filterRole}
+            label="Role"
+            onChange={(e) => setFilterRole(e.target.value)}
+          >
+            <MenuItem value="all">All</MenuItem>
+            {roles.map((role) => (
+              <MenuItem key={role} value={role}>{role}</MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+      </Box>
+
+      <TableContainer component={Paper}>
+        <Table>
+          <TableHead>
+            <TableRow>
+              <TableCell>ID</TableCell>
+              <TableCell>Task Name</TableCell>
+              <TableCell>Status</TableCell>
+              <TableCell>Assigned Role</TableCell>
+              <TableCell>Assigned User</TableCell>
+              <TableCell>Created At</TableCell>
+              <TableCell>Actions</TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {tasks.map((task) => (
+              <TableRow
+                key={task.id}
+                hover
+                onClick={() => handleRowClick(task.processInstanceId)}
+                sx={{ "{{" }}  cursor: 'pointer'  {{ "}}" }}
+              >
+                <TableCell>{task.id}</TableCell>
+                <TableCell>{task.taskName}</TableCell>
+                <TableCell>
+                  <Chip
+                    label={task.status}
+                    color={getStatusColor(task.status)}
+                    size="small"
+                  />
+                </TableCell>
+                <TableCell>{task.assignedRole}</TableCell>
+                <TableCell>{task.assignedUser || '-'}</TableCell>
+                <TableCell>{new Date(task.createdAt).toLocaleString()}</TableCell>
+                <TableCell>
+                  {task.status === TaskStatus.PENDING && (
+                    <Button
+                      size="small"
+                      variant="outlined"
+                      onClick={(e) => handleClaimTask(task.id, e)}
+                    >
+                      Claim
+                    </Button>
+                  )}
+                  {task.status === TaskStatus.CLAIMED && (
+                    <Button
+                      size="small"
+                      variant="contained"
+                      onClick={(e) => handleCompleteTask(task.id, e)}
+                    >
+                      Complete
+                    </Button>
+                  )}
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </TableContainer>
+    </Container>
+  );
+};
+
+export default TaskList;

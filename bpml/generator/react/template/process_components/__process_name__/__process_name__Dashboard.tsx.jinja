@@ -1,0 +1,166 @@
+import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import {
+  Container,
+  Typography,
+  Button,
+  Card,
+  CardContent,
+  Grid,
+  Box,
+  Dialog
+} from '@mui/material';
+import ProcessInstanceService from '../../../services/ProcessInstanceService';
+import { ProcessInstance, ProcessStatus } from '../../../types/types';
+import StartProcessDialog from '../../shared/StartProcessDialog';
+
+const {{ process_name }}Dashboard: React.FC = () => {
+  const [stats, setStats] = useState({
+    running: 0,
+    completed: 0,
+    total: 0
+  });
+  const [recentInstances, setRecentInstances] = useState<ProcessInstance[]>([]);
+  const [isStartDialogOpen, setIsStartDialogOpen] = useState(false);
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const loadData = () => {
+    ProcessInstanceService.getByProcessName('{{ process_name }}').then((instances) => {
+      const running = instances.filter(i => i.status === ProcessStatus.RUNNING).length;
+      const completed = instances.filter(i => i.status === ProcessStatus.COMPLETED).length;
+
+      setStats({
+        running,
+        completed,
+        total: instances.length
+      });
+
+      setRecentInstances(instances.slice(0, 5));
+    });
+  };
+
+  const handleStartProcess = () => {
+    setIsStartDialogOpen(true);
+  };
+
+  const handleStartDialogClose = () => {
+    setIsStartDialogOpen(false);
+    loadData();
+  };
+
+  return (
+    <Container maxWidth="lg" sx={{ "{{" }}  mt: 4  {{ "}}" }}>
+      <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
+        <Typography variant="h4" component="h1">
+          {{ process_name }} Process Dashboard
+        </Typography>
+        <Button variant="contained" color="primary" onClick={handleStartProcess}>
+          Start New Process
+        </Button>
+      </Box>
+
+      {/* Statistics Cards */}
+      <Grid container spacing={3} mb={4}>
+        <Grid item xs={12} md={4}>
+          <Card>
+            <CardContent>
+              <Typography color="text.secondary" gutterBottom>
+                Total Instances
+              </Typography>
+              <Typography variant="h4">
+                {stats.total}
+              </Typography>
+            </CardContent>
+          </Card>
+        </Grid>
+        <Grid item xs={12} md={4}>
+          <Card>
+            <CardContent>
+              <Typography color="text.secondary" gutterBottom>
+                Running
+              </Typography>
+              <Typography variant="h4" color="primary">
+                {stats.running}
+              </Typography>
+            </CardContent>
+          </Card>
+        </Grid>
+        <Grid item xs={12} md={4}>
+          <Card>
+            <CardContent>
+              <Typography color="text.secondary" gutterBottom>
+                Completed
+              </Typography>
+              <Typography variant="h4" color="success.main">
+                {stats.completed}
+              </Typography>
+            </CardContent>
+          </Card>
+        </Grid>
+      </Grid>
+
+      {/* Quick Actions */}
+      <Grid container spacing={3}>
+        <Grid item xs={12} md={6}>
+          <Card>
+            <CardContent>
+              <Typography variant="h6" gutterBottom>
+                Quick Actions
+              </Typography>
+              <Box display="flex" flexDirection="column" gap={2}>
+                <Button
+                  variant="outlined"
+                  onClick={() => navigate('/process/{{ process_name_lower }}/instances')}
+                >
+                  View All Instances
+                </Button>
+                <Button
+                  variant="outlined"
+                  onClick={() => navigate('/process/{{ process_name_lower }}/tasks')}
+                >
+                  View My Tasks
+                </Button>
+              </Box>
+            </CardContent>
+          </Card>
+        </Grid>
+
+        <Grid item xs={12} md={6}>
+          <Card>
+            <CardContent>
+              <Typography variant="h6" gutterBottom>
+                Recent Instances
+              </Typography>
+              <Box display="flex" flexDirection="column" gap={1}>
+                {recentInstances.map((instance) => (
+                  <Box
+                    key={instance.id}
+                    sx={{ "{{" }} p: 1, border: '1px solid #e0e0e0', borderRadius: 1, cursor: 'pointer', '&:hover': { bgcolor: '#f5f5f5' } {{ "}}" }}
+                    onClick={() => navigate(`/process/{{ process_name_lower }}/instances/${instance.id}`)}
+                  >
+                    <Typography variant="body2">
+                      Instance #{instance.id} - {instance.currentState}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      Status: {instance.status}
+                    </Typography>
+                  </Box>
+                ))}
+              </Box>
+            </CardContent>
+          </Card>
+        </Grid>
+      </Grid>
+
+      <Dialog open={isStartDialogOpen} onClose={handleStartDialogClose} maxWidth="sm" fullWidth>
+        <StartProcessDialog processName="{{ process_name }}" onClose={handleStartDialogClose} />
+      </Dialog>
+    </Container>
+  );
+};
+
+export default {{ process_name }}Dashboard;

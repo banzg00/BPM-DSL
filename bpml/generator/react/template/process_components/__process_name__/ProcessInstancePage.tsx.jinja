@@ -1,0 +1,216 @@
+import React, { useEffect, useState } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import {
+  Container,
+  Typography,
+  Button,
+  Paper,
+  Box,
+  Grid,
+  Chip,
+  Dialog
+} from '@mui/material';
+import ProcessInstanceService from '../../../services/ProcessInstanceService';
+import TaskService from '../../../services/TaskService';
+import { ProcessInstance, TaskInstance, AvailableTransition } from '../../../types/types';
+import ProcessTimeline from '../../shared/ProcessTimeline';
+import StateTransitionDialog from '../../shared/StateTransitionDialog';
+
+const ProcessInstancePage: React.FC = () => {
+  const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
+  const [instance, setInstance] = useState<ProcessInstance | null>(null);
+  const [tasks, setTasks] = useState<TaskInstance[]>([]);
+  const [availableTransitions, setAvailableTransitions] = useState<AvailableTransition[]>([]);
+  const [isTransitionDialogOpen, setIsTransitionDialogOpen] = useState(false);
+  const [selectedTransition, setSelectedTransition] = useState<AvailableTransition | null>(null);
+
+  useEffect(() => {
+    if (id) {
+      loadData();
+    }
+  }, [id]);
+
+  const loadData = () => {
+    const instanceId = parseInt(id!);
+
+    ProcessInstanceService.getById(instanceId).then((data) => {
+      setInstance(data);
+    });
+
+    TaskService.getByProcessInstance(instanceId).then((data) => {
+      setTasks(data);
+    });
+
+    ProcessInstanceService.getAvailableTransitions(instanceId).then((data) => {
+      setAvailableTransitions(data);
+    });
+  };
+
+  const handleExecuteTransition = (transition: AvailableTransition) => {
+    setSelectedTransition(transition);
+    setIsTransitionDialogOpen(true);
+  };
+
+  const handleTransitionDialogClose = () => {
+    setIsTransitionDialogOpen(false);
+    loadData();
+  };
+
+  const handleBack = () => {
+    navigate('/process/{{ process_name_lower }}/instances');
+  };
+
+  if (!instance) {
+    return <Container><Typography>Loading...</Typography></Container>;
+  }
+
+  return (
+    <Container maxWidth="lg" sx={{ "{{" }}  mt: 4  {{ "}}" }}>
+      <Paper sx={{ "{{" }}  p: 3  {{ "}}" }}>
+        <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
+          <Typography variant="h4" component="h1">
+            Process Instance #{instance.id}
+          </Typography>
+          <Button onClick={handleBack}>
+            Back to List
+          </Button>
+        </Box>
+
+        <Grid container spacing={3}>
+          {/* Instance Details */}
+          <Grid item xs={12} md={6}>
+            <Typography variant="h6" gutterBottom>
+              Details
+            </Typography>
+            <Box display="flex" flexDirection="column" gap={2}>
+              <Box>
+                <Typography variant="subtitle2" color="text.secondary">
+                  Current State
+                </Typography>
+                <Typography variant="body1">
+                  {instance.currentState}
+                </Typography>
+              </Box>
+              <Box>
+                <Typography variant="subtitle2" color="text.secondary">
+                  Status
+                </Typography>
+                <Chip label={instance.status} color="primary" size="small" />
+              </Box>
+              <Box>
+                <Typography variant="subtitle2" color="text.secondary">
+                  Initiated By
+                </Typography>
+                <Typography variant="body1">
+                  {instance.initiatedBy}
+                </Typography>
+              </Box>
+              <Box>
+                <Typography variant="subtitle2" color="text.secondary">
+                  Started At
+                </Typography>
+                <Typography variant="body1">
+                  {new Date(instance.startedAt).toLocaleString()}
+                </Typography>
+              </Box>
+              {instance.completedAt && (
+                <Box>
+                  <Typography variant="subtitle2" color="text.secondary">
+                    Completed At
+                  </Typography>
+                  <Typography variant="body1">
+                    {new Date(instance.completedAt).toLocaleString()}
+                  </Typography>
+                </Box>
+              )}
+            </Box>
+          </Grid>
+
+          {/* Available Transitions */}
+          <Grid item xs={12} md={6}>
+            <Typography variant="h6" gutterBottom>
+              Available Transitions
+            </Typography>
+            <Box display="flex" flexDirection="column" gap={1}>
+              {availableTransitions.length === 0 ? (
+                <Typography variant="body2" color="text.secondary">
+                  No transitions available
+                </Typography>
+              ) : (
+                availableTransitions.map((transition) => (
+                  <Button
+                    key={transition.transitionName}
+                    variant="outlined"
+                    onClick={() => handleExecuteTransition(transition)}
+                  >
+                    {transition.transitionName}
+                    <Typography variant="caption" sx={{ "{{" }}  ml: 1  {{ "}}" }}>
+                      ({transition.fromState} -&gt; {transition.toState})
+                    </Typography>
+                  </Button>
+                ))
+              )}
+            </Box>
+          </Grid>
+
+          {/* Tasks */}
+          <Grid item xs={12}>
+            <Typography variant="h6" gutterBottom>
+              Tasks
+            </Typography>
+            {tasks.length === 0 ? (
+              <Typography variant="body2" color="text.secondary">
+                No tasks found
+              </Typography>
+            ) : (
+              <Box display="flex" flexDirection="column" gap={1}>
+                {tasks.map((task) => (
+                  <Box
+                    key={task.id}
+                    sx={{ "{{" }}  p: 2, border: '1px solid #e0e0e0', borderRadius: 1  {{ "}}" }}
+                  >
+                    <Typography variant="body1">
+                      {task.taskName}
+                    </Typography>
+                    <Box display="flex" gap={2} mt={1}>
+                      <Chip label={task.status} size="small" />
+                      <Typography variant="caption" color="text.secondary">
+                        Role: {task.assignedRole}
+                      </Typography>
+                      {task.assignedUser && (
+                        <Typography variant="caption" color="text.secondary">
+                          Assigned to: {task.assignedUser}
+                        </Typography>
+                      )}
+                    </Box>
+                  </Box>
+                ))}
+              </Box>
+            )}
+          </Grid>
+
+          {/* Timeline */}
+          <Grid item xs={12}>
+            <Typography variant="h6" gutterBottom>
+              Process History
+            </Typography>
+            <ProcessTimeline processInstanceId={parseInt(id!)} />
+          </Grid>
+        </Grid>
+      </Paper>
+
+      {selectedTransition && (
+        <Dialog open={isTransitionDialogOpen} onClose={handleTransitionDialogClose} maxWidth="sm" fullWidth>
+          <StateTransitionDialog
+            processInstanceId={parseInt(id!)}
+            transition={selectedTransition}
+            onClose={handleTransitionDialogClose}
+          />
+        </Dialog>
+      )}
+    </Container>
+  );
+};
+
+export default ProcessInstancePage;

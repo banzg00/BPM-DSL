@@ -1,0 +1,118 @@
+import React, { useEffect } from 'react';
+import {
+  Button,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  TextField,
+  {% for attr in attributes %}{% if attr.type | is_enum_type %}FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  {% endif %}{% endfor %}
+} from '@mui/material';
+import { useForm, Controller } from 'react-hook-form';
+import {{ entity_name }}Service from '../../services/{{ entity_name }}Service';
+import { {{ entity_name }}{% for attr in attributes %}{% if attr.type | is_enum_type %}, {{ entity_name }}{{ attr.name | capitalize_str }}{% endif %}{% endfor %} } from '../../types/types';
+
+interface {{ entity_name }}DialogProps {
+  id?: number;
+  onClose: () => void;
+}
+
+const {{ entity_name }}Dialog: React.FC<{{ entity_name }}DialogProps> = ({ id, onClose }) => {
+  const { control, handleSubmit, setValue, formState: { errors } } = useForm<{{ entity_name }}>();
+
+  useEffect(() => {
+    if (id) {
+      {{ entity_name }}Service.get{{ entity_name }}ById(id).then(({{ entity_name_lower }}: {{ entity_name }}) => {
+        {% for attr in attributes %}
+        setValue('{{ attr.name }}', {{ entity_name_lower }}.{{ attr.name }});
+        {% endfor %}
+      });
+    }
+  }, [id, setValue]);
+
+  const onSubmit = (formData: {{ entity_name }}) => {
+    if (id) {
+      {{ entity_name }}Service.update{{ entity_name }}({ ...formData, id }).then(() => {
+        onClose();
+      });
+    } else {
+      {{ entity_name }}Service.create{{ entity_name }}(formData).then(() => {
+        onClose();
+      });
+    }
+  };
+
+  const onCancel = () => {
+    onClose();
+  };
+
+  return (
+    <>
+      <DialogTitle>{id ? 'Edit' : 'Create'} {{ entity_name }}</DialogTitle>
+      <DialogContent>
+        <form onSubmit={handleSubmit(onSubmit)} style={{ "{{" }} display: 'flex', flexDirection: 'column', gap: '16px', marginTop: '8px' {{ "}}" }}>
+          {% for attr in attributes %}
+          {% if attr.type | is_enum_type %}
+          <Controller
+            name="{{ attr.name }}"
+            control={control}
+            defaultValue={"" as any}
+            rules={{ "{{" }} required: true {{ "}}" }}
+            render={({ field }) => (
+              <FormControl fullWidth variant="outlined">
+                <InputLabel id="{{ attr.name }}-label">{{ attr.name | capitalize_str }}</InputLabel>
+                <Select
+                  {...field}
+                  labelId="{{ attr.name }}-label"
+                  label="{{ attr.name | capitalize_str }}"
+                  error={!!errors.{{ attr.name }}}
+                >
+                  {% for value in attr.type | get_enum_values %}
+                  <MenuItem value="{{ value }}">{{ value }}</MenuItem>
+                  {% endfor %}
+                </Select>
+              </FormControl>
+            )}
+          />
+          {% else %}
+          <Controller
+            name="{{ attr.name }}"
+            control={control}
+            defaultValue={"" as any}
+            rules={{ "{{" }} required: true {{ "}}" }}
+            render={({ field }) => (
+              <TextField
+                {...field}
+                label="{{ attr.name | capitalize_str }}"
+                variant="outlined"
+                fullWidth
+                {% if attr.type | format_type == 'number' %}
+                type="number"
+                {% endif %}
+                error={!!errors.{{ attr.name }}}
+                helperText={errors.{{ attr.name }} ? '{{ attr.name | capitalize_str }} is required' : ''}
+              />
+            )}
+          />
+          {% endif %}
+          {% endfor %}
+        </form>
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={onCancel}>Cancel</Button>
+        <Button
+          variant="contained"
+          color="primary"
+          onClick={handleSubmit(onSubmit)}
+        >
+          {id ? 'Update' : 'Create'}
+        </Button>
+      </DialogActions>
+    </>
+  );
+};
+
+export default {{ entity_name }}Dialog;

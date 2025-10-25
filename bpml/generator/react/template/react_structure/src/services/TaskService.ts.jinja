@@ -1,0 +1,103 @@
+import axios from 'axios';
+import { TaskInstance } from '../types/types';
+
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8080/api';
+
+class TaskService {
+  getById(id: number) {
+    return axios.get<TaskInstance>(`${API_BASE_URL}/tasks/${id}`)
+      .then(response => response.data)
+      .catch(error => {
+        console.error(`Error fetching task ${id}:`, error);
+        throw error;
+      });
+  }
+
+  getAll() {
+    return axios.get<TaskInstance[]>(`${API_BASE_URL}/tasks/all`)
+      .then(response => response.data)
+      .catch(error => {
+        console.error('Error fetching tasks:', error);
+        throw error;
+      });
+  }
+
+  getByProcessInstance(processInstanceId: number) {
+    return axios.get<TaskInstance[]>(
+      `${API_BASE_URL}/tasks/by-process/${processInstanceId}`
+    )
+    .then(response => response.data)
+    .catch(error => {
+      console.error(`Error fetching tasks for process ${processInstanceId}:`, error);
+      throw error;
+    });
+  }
+
+  getByRole(role: string) {
+    return axios.get<TaskInstance[]>(`${API_BASE_URL}/tasks/by-role/${role}`)
+      .then(response => response.data)
+      .catch(error => {
+        console.error(`Error fetching tasks for role ${role}:`, error);
+        throw error;
+      });
+  }
+
+  getByUser(userId: string) {
+    return axios.get<TaskInstance[]>(`${API_BASE_URL}/tasks/by-user/${userId}`)
+      .then(response => response.data)
+      .catch(error => {
+        console.error(`Error fetching tasks for user ${userId}:`, error);
+        throw error;
+      });
+  }
+
+  getByStatus(status: string) {
+    return axios.get<TaskInstance[]>(`${API_BASE_URL}/tasks/by-status/${status}`)
+      .then(response => response.data)
+      .catch(error => {
+        console.error(`Error fetching tasks with status ${status}:`, error);
+        throw error;
+      });
+  }
+
+  claimTask(id: number, userId: string) {
+    return axios.post<TaskInstance>(
+      `${API_BASE_URL}/tasks/${id}/claim`,
+      null,
+      { params: { userId } }
+    )
+    .then(response => response.data)
+    .catch(error => {
+      console.error(`Error claiming task ${id}:`, error);
+      throw error;
+    });
+  }
+
+  completeTask(id: number, userId: string, taskData?: Record<string, any>) {
+    return axios.post<TaskInstance>(
+      `${API_BASE_URL}/tasks/${id}/complete`,
+      taskData || {},
+      { params: { userId } }
+    )
+    .then(response => response.data)
+    .catch(error => {
+      console.error(`Error completing task ${id}:`, error);
+      throw error;
+    });
+  }
+
+  cancelTask(id: number, reason: string) {
+    return axios.post<TaskInstance>(
+      `${API_BASE_URL}/tasks/${id}/cancel`,
+      null,
+      { params: { reason } }
+    )
+    .then(response => response.data)
+    .catch(error => {
+      console.error(`Error cancelling task ${id}:`, error);
+      throw error;
+    });
+  }
+}
+
+export default new TaskService();

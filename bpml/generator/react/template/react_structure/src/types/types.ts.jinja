@@ -1,0 +1,87 @@
+// Entity type definitions
+{% for entity in entities %}
+export interface {{ entity.name }} {
+  id?: number;
+{% for attr in entity.attributes %}  {{ attr.name }}: {% if attr.type | is_enum_type %}{{ entity.name }}{{ attr.name | capitalize_str }}{% else %}{{ attr.type | format_type }}{% endif %};
+{% endfor %}
+}
+
+{% if entity.attributes %}{% for attr in entity.attributes %}{% if attr.type | is_enum_type %}
+export enum {{ entity.name }}{{ attr.name | capitalize_str }} {
+{% for value in attr.type | get_enum_values %}  {{ value }} = '{{ value }}',
+{% endfor %}}
+
+{% endif %}{% endfor %}{% endif %}
+{% endfor %}
+
+// Process-related type definitions
+export enum ProcessStatus {
+  RUNNING = 'RUNNING',
+  COMPLETED = 'COMPLETED',
+  TERMINATED = 'TERMINATED',
+  SUSPENDED = 'SUSPENDED'
+}
+
+export enum TaskStatus {
+  PENDING = 'PENDING',
+  CLAIMED = 'CLAIMED',
+  COMPLETED = 'COMPLETED',
+  CANCELLED = 'CANCELLED'
+}
+
+export interface ProcessInstance {
+  id: number;
+  processName: string;
+  currentState: string;
+  status: ProcessStatus;
+  initiatedBy: string;
+  processVariables: Record<string, any>;
+  startedAt: string;
+  completedAt?: string;
+  terminatedReason?: string;
+}
+
+export interface TaskInstance {
+  id: number;
+  processInstanceId: number;
+  taskName: string;
+  assignedRole: string;
+  assignedUser?: string;
+  status: TaskStatus;
+  entityId?: number;
+  entityType?: string;
+  taskData: Record<string, any>;
+  createdAt: string;
+  claimedAt?: string;
+  completedAt?: string;
+  completedBy?: string;
+}
+
+export interface AvailableTransition {
+  transitionName: string;
+  fromState: string;
+  toState: string;
+  requiredRole: string;
+}
+
+export interface TransitionHistory {
+  id: number;
+  processInstanceId: number;
+  transitionName: string;
+  fromState: string;
+  toState: string;
+  executedBy: string;
+  executedAt: string;
+  comments?: string;
+}
+
+export interface StartProcessRequest {
+  initiatedBy: string;
+  processVariables?: Record<string, any>;
+}
+
+export interface ExecuteTransitionRequest {
+  executedBy: string;
+  userRole: string;
+  comments?: string;
+}

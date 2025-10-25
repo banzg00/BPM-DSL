@@ -1,0 +1,100 @@
+import React, { useState } from 'react';
+import {
+  Button,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  TextField,
+  Typography,
+  Box
+} from '@mui/material';
+import ProcessInstanceService from '../../services/ProcessInstanceService';
+import { AvailableTransition } from '../../types/types';
+
+interface StateTransitionDialogProps {
+  processInstanceId: number;
+  transition: AvailableTransition;
+  onClose: () => void;
+}
+
+const StateTransitionDialog: React.FC<StateTransitionDialogProps> = ({
+  processInstanceId,
+  transition,
+  onClose
+}) => {
+  const [executedBy, setExecutedBy] = useState('');
+  const [comments, setComments] = useState('');
+  const [error, setError] = useState('');
+
+  const handleExecute = () => {
+    if (!executedBy.trim()) {
+      setError('User ID is required');
+      return;
+    }
+
+    ProcessInstanceService.executeTransition(
+      processInstanceId,
+      transition.transitionName,
+      {
+        executedBy,
+        userRole: transition.requiredRole,
+        comments: comments || undefined
+      }
+    )
+    .then(() => {
+      onClose();
+    })
+    .catch((err) => {
+      setError(err.message || 'Failed to execute transition');
+    });
+  };
+
+  return (
+    <>
+      <DialogTitle>Execute Transition: {transition.transitionName}</DialogTitle>
+      <DialogContent>
+        <Box display="flex" flexDirection="column" gap={2} sx={{ "{{" }}  mt: 1  {{ "}}" }}>
+          <Typography variant="body2" color="text.secondary">
+            From: <strong>{transition.fromState}</strong> -&gt; To: <strong>{transition.toState}</strong>
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            Required Role: <strong>{transition.requiredRole}</strong>
+          </Typography>
+
+          <TextField
+            label="User ID"
+            value={executedBy}
+            onChange={(e) => setExecutedBy(e.target.value)}
+            fullWidth
+            required
+            error={!!error && !executedBy}
+            helperText={!!error && !executedBy ? 'User ID is required' : ''}
+          />
+
+          <TextField
+            label="Comments (optional)"
+            value={comments}
+            onChange={(e) => setComments(e.target.value)}
+            fullWidth
+            multiline
+            rows={3}
+          />
+
+          {error && (
+            <Typography color="error" variant="body2">
+              {error}
+            </Typography>
+          )}
+        </Box>
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={onClose}>Cancel</Button>
+        <Button variant="contained" color="primary" onClick={handleExecute}>
+          Execute
+        </Button>
+      </DialogActions>
+    </>
+  );
+};
+
+export default StateTransitionDialog;

@@ -1,0 +1,70 @@
+import React, { useState } from 'react';
+import {
+  Button,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  TextField,
+  Typography
+} from '@mui/material';
+import ProcessInstanceService from '../../services/ProcessInstanceService';
+
+interface StartProcessDialogProps {
+  processName: string;
+  onClose: () => void;
+}
+
+const StartProcessDialog: React.FC<StartProcessDialogProps> = ({ processName, onClose }) => {
+  const [initiatedBy, setInitiatedBy] = useState('');
+  const [error, setError] = useState('');
+
+  const handleStart = () => {
+    if (!initiatedBy.trim()) {
+      setError('User ID is required');
+      return;
+    }
+
+    ProcessInstanceService.startProcess(processName, {
+      initiatedBy,
+      processVariables: {}
+    })
+    .then(() => {
+      onClose();
+    })
+    .catch((err) => {
+      setError(err.message || 'Failed to start process');
+    });
+  };
+
+  return (
+    <>
+      <DialogTitle>Start New {processName} Process</DialogTitle>
+      <DialogContent>
+        <TextField
+          label="Initiated By (User ID)"
+          value={initiatedBy}
+          onChange={(e) => setInitiatedBy(e.target.value)}
+          fullWidth
+          required
+          margin="normal"
+          error={!!error && !initiatedBy}
+          helperText={!!error && !initiatedBy ? 'User ID is required' : ''}
+        />
+
+        {error && (
+          <Typography color="error" variant="body2" sx={{ "{{" }}  mt: 1  {{ "}}" }}>
+            {error}
+          </Typography>
+        )}
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={onClose}>Cancel</Button>
+        <Button variant="contained" color="primary" onClick={handleStart}>
+          Start Process
+        </Button>
+      </DialogActions>
+    </>
+  );
+};
+
+export default StartProcessDialog;

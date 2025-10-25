@@ -1,0 +1,136 @@
+import axios from 'axios';
+import {
+  ProcessInstance,
+  StartProcessRequest,
+  AvailableTransition,
+  ExecuteTransitionRequest,
+  TransitionHistory
+} from '../types/types';
+
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8080/api';
+
+class ProcessInstanceService {
+  startProcess(processName: string, request: StartProcessRequest) {
+    return axios.post<ProcessInstance>(
+      `${API_BASE_URL}/processes/${processName}/start`,
+      request
+    )
+    .then(response => response.data)
+    .catch(error => {
+      console.error('Error starting process:', error);
+      throw error;
+    });
+  }
+
+  getById(id: number) {
+    return axios.get<ProcessInstance>(`${API_BASE_URL}/processes/instances/${id}`)
+      .then(response => response.data)
+      .catch(error => {
+        console.error(`Error fetching process instance ${id}:`, error);
+        throw error;
+      });
+  }
+
+  getAll() {
+    return axios.get<ProcessInstance[]>(`${API_BASE_URL}/processes/instances/all`)
+      .then(response => response.data)
+      .catch(error => {
+        console.error('Error fetching process instances:', error);
+        throw error;
+      });
+  }
+
+  getByProcessName(processName: string) {
+    return axios.get<ProcessInstance[]>(
+      `${API_BASE_URL}/processes/instances/by-name/${processName}`
+    )
+    .then(response => response.data)
+    .catch(error => {
+      console.error(`Error fetching instances for process ${processName}:`, error);
+      throw error;
+    });
+  }
+
+  getByStatus(status: string) {
+    return axios.get<ProcessInstance[]>(
+      `${API_BASE_URL}/processes/instances/by-status/${status}`
+    )
+    .then(response => response.data)
+    .catch(error => {
+      console.error(`Error fetching instances with status ${status}:`, error);
+      throw error;
+    });
+  }
+
+  getByInitiatedBy(userId: string) {
+    return axios.get<ProcessInstance[]>(
+      `${API_BASE_URL}/processes/instances/by-user/${userId}`
+    )
+    .then(response => response.data)
+    .catch(error => {
+      console.error(`Error fetching instances for user ${userId}:`, error);
+      throw error;
+    });
+  }
+
+  getCurrentState(id: number) {
+    return axios.get<{ currentState: string }>(
+      `${API_BASE_URL}/processes/instances/${id}/current-state`
+    )
+    .then(response => response.data.currentState)
+    .catch(error => {
+      console.error(`Error fetching current state for instance ${id}:`, error);
+      throw error;
+    });
+  }
+
+  getAvailableTransitions(id: number, userRole?: string) {
+    const params = userRole ? { userRole } : {};
+    return axios.get<AvailableTransition[]>(
+      `${API_BASE_URL}/processes/instances/${id}/transitions`,
+      { params }
+    )
+    .then(response => response.data)
+    .catch(error => {
+      console.error(`Error fetching transitions for instance ${id}:`, error);
+      throw error;
+    });
+  }
+
+  executeTransition(id: number, transitionName: string, request: ExecuteTransitionRequest) {
+    return axios.post<ProcessInstance>(
+      `${API_BASE_URL}/processes/instances/${id}/transitions/${transitionName}`,
+      request
+    )
+    .then(response => response.data)
+    .catch(error => {
+      console.error(`Error executing transition ${transitionName}:`, error);
+      throw error;
+    });
+  }
+
+  getProcessHistory(id: number) {
+    return axios.get<TransitionHistory[]>(
+      `${API_BASE_URL}/processes/instances/${id}/history`
+    )
+    .then(response => response.data)
+    .catch(error => {
+      console.error(`Error fetching history for instance ${id}:`, error);
+      throw error;
+    });
+  }
+
+  terminateProcess(id: number, reason: string, userId: string) {
+    return axios.delete(
+      `${API_BASE_URL}/processes/instances/${id}/terminate`,
+      { params: { reason, userId } }
+    )
+    .then(response => response.data)
+    .catch(error => {
+      console.error(`Error terminating process instance ${id}:`, error);
+      throw error;
+    });
+  }
+}
+
+export default new ProcessInstanceService();
