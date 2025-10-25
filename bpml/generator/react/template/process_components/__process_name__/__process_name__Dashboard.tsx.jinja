@@ -58,9 +58,14 @@ const {{ process_name }}Dashboard: React.FC = () => {
         <Typography variant="h4" component="h1">
           {{ process_name }} Process Dashboard
         </Typography>
-        <Button variant="contained" color="primary" onClick={handleStartProcess}>
-          Start New Process
-        </Button>
+        <Box>
+          <Button onClick={() => navigate('/')} sx={{ "{{" }}  mr: 1  {{ "}}" }}>
+            Back
+          </Button>
+          <Button variant="contained" color="primary" onClick={handleStartProcess}>
+            Start New Process
+          </Button>
+        </Box>
       </Box>
 
       {/* Statistics Cards */}
