@@ -75,6 +75,10 @@ public class ProcessEngine {
         ProcessInstance processInstance = processInstanceRepository.findById(processInstanceId)
                 .orElseThrow(() -> new NotFoundException("Process instance not found: " + processInstanceId));
 
+        if (processInstance.getStatus() == ProcessInstance.ProcessStatus.SUSPENDED) {
+            throw new IllegalStateException("Cannot execute transition on suspended process. Please resume the process first.");
+        }
+
         if (processInstance.getStatus() != ProcessInstance.ProcessStatus.RUNNING) {
             throw new IllegalStateException("Cannot execute transition on non-running process. Current status: " + processInstance.getStatus());
         }
@@ -159,6 +163,13 @@ public class ProcessEngine {
         ProcessInstance processInstance = processInstanceRepository.findById(processInstanceId)
                 .orElseThrow(() -> new NotFoundException("Process instance not found: " + processInstanceId));
 
+        // Return empty list if process is not running
+        if (processInstance.getStatus() != ProcessInstance.ProcessStatus.RUNNING) {
+            log.info("Process instance {} is not running (status: {}), returning empty transitions",
+                    processInstanceId, processInstance.getStatus());
+            return Collections.emptyList();
+        }
+
         ProcessDefinition definition = processDefinitionRepository.findByProcessName(processInstance.getProcessName())
                 .orElseThrow(() -> new NotFoundException("Process definition not found: " + processInstance.getProcessName()));
 
@@ -228,6 +239,57 @@ public class ProcessEngine {
         log.info("Process instance {} terminated", processInstanceId);
     }
 
+    /**
+     * Suspend a process instance (temporary pause)
+     */
+    @Transactional
+    public ProcessInstanceDTO suspendProcess(Long processInstanceId, String reason, String userId) {
+        log.info("Suspending process instance {} by user {}. Reason: {}", processInstanceId, userId, reason);
+
+        ProcessInstance processInstance = processInstanceRepository.findById(processInstanceId)
+                .orElseThrow(() -> new NotFoundException("Process instance not found: " + processInstanceId));
+
+        if (processInstance.getStatus() != ProcessInstance.ProcessStatus.RUNNING) {
+            throw new IllegalStateException("Can only suspend RUNNING processes. Current status: " + processInstance.getStatus());
+        }
+
+        processInstance.setStatus(ProcessInstance.ProcessStatus.SUSPENDED);
+        processInstance.setSuspendedAt(LocalDateTime.now());
+        processInstance.setSuspendedReason(reason);
+        processInstance.setSuspendedBy(userId);
+
+        ProcessInstance savedInstance = processInstanceRepository.save(processInstance);
+        log.info("Process instance {} suspended", processInstanceId);
+
+        return mapToProcessInstanceDTO(savedInstance);
+    }
+
+    /**
+     * Resume a suspended process instance
+     */
+    @Transactional
+    public ProcessInstanceDTO resumeProcess(Long processInstanceId, String userId) {
+        log.info("Resuming process instance {} by user {}", processInstanceId, userId);
+
+        ProcessInstance processInstance = processInstanceRepository.findById(processInstanceId)
+                .orElseThrow(() -> new NotFoundException("Process instance not found: " + processInstanceId));
+
+        if (processInstance.getStatus() != ProcessInstance.ProcessStatus.SUSPENDED) {
+            throw new IllegalStateException("Can only resume SUSPENDED processes. Current status: " + processInstance.getStatus());
+        }
+
+        processInstance.setStatus(ProcessInstance.ProcessStatus.RUNNING);
+        // Clear suspension fields
+        processInstance.setSuspendedAt(null);
+        processInstance.setSuspendedReason(null);
+        processInstance.setSuspendedBy(null);
+
+        ProcessInstance savedInstance = processInstanceRepository.save(processInstance);
+        log.info("Process instance {} resumed", processInstanceId);
+
+        return mapToProcessInstanceDTO(savedInstance);
+    }
+
     // ===== PRIVATE HELPER METHODS =====
 
     private void createTasksForState(ProcessInstance processInstance, String state, Map<String, Object> definitionMap) {
@@ -290,6 +352,9 @@ public class ProcessEngine {
     }
 
     private Map<String, Object> parseDefinitionJson(String json) {
+        if (json == null || json.isEmpty()) {
+            return Collections.emptyMap();
+        }
         try {
             return objectMapper.readValue(json, Map.class);
         } catch (JsonProcessingException e) {
@@ -321,6 +386,9 @@ public class ProcessEngine {
                 .startedAt(instance.getStartedAt())
                 .completedAt(instance.getCompletedAt())
                 .terminatedReason(instance.getTerminatedReason())
+                .suspendedAt(instance.getSuspendedAt())
+                .suspendedReason(instance.getSuspendedReason())
+                .suspendedBy(instance.getSuspendedBy())
                 .build();
     }
 

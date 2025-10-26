@@ -24,7 +24,7 @@ class TaskService {
 
   getByProcessInstance(processInstanceId: number) {
     return axios.get<TaskInstance[]>(
-      `${API_BASE_URL}/tasks/by-process/${processInstanceId}`
+      `${API_BASE_URL}/tasks/process/${processInstanceId}`
     )
     .then(response => response.data)
     .catch(error => {
@@ -34,7 +34,7 @@ class TaskService {
   }
 
   getByRole(role: string) {
-    return axios.get<TaskInstance[]>(`${API_BASE_URL}/tasks/by-role/${role}`)
+    return axios.get<TaskInstance[]>(`${API_BASE_URL}/tasks/role/${role}`)
       .then(response => response.data)
       .catch(error => {
         console.error(`Error fetching tasks for role ${role}:`, error);
@@ -43,7 +43,7 @@ class TaskService {
   }
 
   getByUser(userId: string) {
-    return axios.get<TaskInstance[]>(`${API_BASE_URL}/tasks/by-user/${userId}`)
+    return axios.get<TaskInstance[]>(`${API_BASE_URL}/tasks/user/${userId}`)
       .then(response => response.data)
       .catch(error => {
         console.error(`Error fetching tasks for user ${userId}:`, error);
@@ -52,7 +52,7 @@ class TaskService {
   }
 
   getByStatus(status: string) {
-    return axios.get<TaskInstance[]>(`${API_BASE_URL}/tasks/by-status/${status}`)
+    return axios.get<TaskInstance[]>(`${API_BASE_URL}/tasks/status/${status}`)
       .then(response => response.data)
       .catch(error => {
         console.error(`Error fetching tasks with status ${status}:`, error);

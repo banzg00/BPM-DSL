@@ -131,6 +131,32 @@ class ProcessInstanceService {
       throw error;
     });
   }
+
+  suspendProcess(id: number, reason: string, userId: string) {
+    return axios.post<ProcessInstance>(
+      `${API_BASE_URL}/processes/instances/${id}/suspend`,
+      null,
+      { params: { reason, userId } }
+    )
+    .then(response => response.data)
+    .catch(error => {
+      console.error(`Error suspending process instance ${id}:`, error);
+      throw error;
+    });
+  }
+
+  resumeProcess(id: number, userId: string) {
+    return axios.post<ProcessInstance>(
+      `${API_BASE_URL}/processes/instances/${id}/resume`,
+      null,
+      { params: { userId } }
+    )
+    .then(response => response.data)
+    .catch(error => {
+      console.error(`Error resuming process instance ${id}:`, error);
+      throw error;
+    });
+  }
 }
 
 export default new ProcessInstanceService();

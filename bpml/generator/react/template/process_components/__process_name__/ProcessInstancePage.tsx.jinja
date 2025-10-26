@@ -8,11 +8,15 @@ import {
   Box,
   Grid,
   Chip,
-  Dialog
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  TextField
 } from '@mui/material';
 import ProcessInstanceService from '../../../services/ProcessInstanceService';
 import TaskService from '../../../services/TaskService';
-import { ProcessInstance, ProcessStatus, TaskInstance, AvailableTransition } from '../../../types/types';
+import { ProcessInstance, ProcessStatus, TaskInstance, TaskStatus, AvailableTransition } from '../../../types/types';
 import ProcessTimeline from '../../shared/ProcessTimeline';
 import StateTransitionDialog from '../../shared/StateTransitionDialog';
 
@@ -24,6 +28,11 @@ const ProcessInstancePage: React.FC = () => {
   const [availableTransitions, setAvailableTransitions] = useState<AvailableTransition[]>([]);
   const [isTransitionDialogOpen, setIsTransitionDialogOpen] = useState(false);
   const [selectedTransition, setSelectedTransition] = useState<AvailableTransition | null>(null);
+  const [isSuspendDialogOpen, setIsSuspendDialogOpen] = useState(false);
+  const [isTerminateDialogOpen, setIsTerminateDialogOpen] = useState(false);
+  const [suspendReason, setSuspendReason] = useState('');
+  const [terminateReason, setTerminateReason] = useState('');
+  const [historyRefreshKey, setHistoryRefreshKey] = useState(0);
 
   useEffect(() => {
     if (id) {
@@ -55,10 +64,65 @@ const ProcessInstancePage: React.FC = () => {
   const handleTransitionDialogClose = () => {
     setIsTransitionDialogOpen(false);
     loadData();
+    setHistoryRefreshKey(prev => prev + 1);
   };
 
   const handleBack = () => {
     navigate('/process/{{ process_name_lower }}/instances');
+  };
+
+  const handleSuspend = () => {
+    setIsSuspendDialogOpen(true);
+  };
+
+  const handleConfirmSuspend = () => {
+    if (suspendReason && instance) {
+      ProcessInstanceService.suspendProcess(instance.id, suspendReason, 'current-user')
+        .then(() => {
+          setIsSuspendDialogOpen(false);
+          setSuspendReason('');
+          loadData();
+          setHistoryRefreshKey(prev => prev + 1);
+        })
+        .catch(error => {
+          console.error('Failed to suspend process:', error);
+          alert('Failed to suspend process: ' + error.message);
+        });
+    }
+  };
+
+  const handleResume = () => {
+    if (instance) {
+      ProcessInstanceService.resumeProcess(instance.id, 'current-user')
+        .then(() => {
+          loadData();
+          setHistoryRefreshKey(prev => prev + 1);
+        })
+        .catch(error => {
+          console.error('Failed to resume process:', error);
+          alert('Failed to resume process: ' + error.message);
+        });
+    }
+  };
+
+  const handleTerminate = () => {
+    setIsTerminateDialogOpen(true);
+  };
+
+  const handleConfirmTerminate = () => {
+    if (terminateReason && instance) {
+      ProcessInstanceService.terminateProcess(instance.id, terminateReason, 'current-user')
+        .then(() => {
+          setIsTerminateDialogOpen(false);
+          setTerminateReason('');
+          loadData();
+          setHistoryRefreshKey(prev => prev + 1);
+        })
+        .catch(error => {
+          console.error('Failed to terminate process:', error);
+          alert('Failed to terminate process: ' + error.message);
+        });
+    }
   };
 
   const getStatusColor = (status: ProcessStatus) => {
@@ -76,6 +140,21 @@ const ProcessInstancePage: React.FC = () => {
     }
   };
 
+  const getTaskStatusColor = (status: TaskStatus) => {
+    switch (status) {
+      case TaskStatus.PENDING:
+        return 'warning';
+      case TaskStatus.CLAIMED:
+        return 'info';
+      case TaskStatus.COMPLETED:
+        return 'success';
+      case TaskStatus.CANCELLED:
+        return 'error';
+      default:
+        return 'default';
+    }
+  };
+
   if (!instance) {
     return <Container><Typography>Loading...</Typography></Container>;
   }
@@ -87,9 +166,26 @@ const ProcessInstancePage: React.FC = () => {
           <Typography variant="h4" component="h1">
             Process Instance #{instance.id}
           </Typography>
-          <Button onClick={handleBack}>
-            Back to List
-          </Button>
+          <Box display="flex" gap={1}>
+            {instance.status === ProcessStatus.RUNNING && (
+              <>
+                <Button onClick={handleSuspend} variant="outlined" color="warning">
+                  Suspend
+                </Button>
+                <Button onClick={handleTerminate} variant="outlined" color="error">
+                  Terminate
+                </Button>
+              </>
+            )}
+            {instance.status === ProcessStatus.SUSPENDED && (
+              <Button onClick={handleResume} variant="contained" color="primary">
+                Resume
+              </Button>
+            )}
+            <Button onClick={handleBack}>
+              Back to List
+            </Button>
+          </Box>
         </Box>
 
         <Grid container spacing={3}>
@@ -193,7 +289,7 @@ const ProcessInstancePage: React.FC = () => {
                       {task.taskName}
                     </Typography>
                     <Box display="flex" gap={2} mt={1}>
-                      <Chip label={task.status} size="small" />
+                      <Chip label={task.status} color={getTaskStatusColor(task.status)} size="small" />
                       <Typography variant="caption" color="text.secondary">
                         Role: {task.assignedRole}
                       </Typography>
@@ -214,7 +310,7 @@ const ProcessInstancePage: React.FC = () => {
             <Typography variant="h6" gutterBottom>
               Process History
             </Typography>
-            <ProcessTimeline processInstanceId={parseInt(id!)} />
+            <ProcessTimeline processInstanceId={parseInt(id!)} refreshKey={historyRefreshKey} />
           </Grid>
         </Grid>
       </Paper>
@@ -228,6 +324,52 @@ const ProcessInstancePage: React.FC = () => {
           />
         </Dialog>
       )}
+
+      {/* Suspend Dialog */}
+      <Dialog open={isSuspendDialogOpen} onClose={() => setIsSuspendDialogOpen(false)}>
+        <DialogTitle>Suspend Process</DialogTitle>
+        <DialogContent>
+          <TextField
+            autoFocus
+            margin="dense"
+            label="Reason for suspension"
+            fullWidth
+            multiline
+            rows={3}
+            value={suspendReason}
+            onChange={(e) => setSuspendReason(e.target.value)}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setIsSuspendDialogOpen(false)}>Cancel</Button>
+          <Button onClick={handleConfirmSuspend} disabled={!suspendReason} variant="contained" color="warning">
+            Suspend
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Terminate Dialog */}
+      <Dialog open={isTerminateDialogOpen} onClose={() => setIsTerminateDialogOpen(false)}>
+        <DialogTitle>Terminate Process</DialogTitle>
+        <DialogContent>
+          <TextField
+            autoFocus
+            margin="dense"
+            label="Reason for termination"
+            fullWidth
+            multiline
+            rows={3}
+            value={terminateReason}
+            onChange={(e) => setTerminateReason(e.target.value)}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setIsTerminateDialogOpen(false)}>Cancel</Button>
+          <Button onClick={handleConfirmTerminate} disabled={!terminateReason} variant="contained" color="error">
+            Terminate
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Container>
   );
 };

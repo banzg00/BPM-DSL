@@ -30,4 +30,10 @@ public class ProcessInstanceDTO {
     private LocalDateTime completedAt;
 
     private String terminatedReason;
+
+    @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss")
+    private LocalDateTime suspendedAt;
+
+    private String suspendedReason;
+    private String suspendedBy;
 }

@@ -156,4 +156,29 @@ public class ProcessInstanceController {
         processEngine.terminateProcess(id, reason, userId);
         return ResponseEntity.noContent().build();
     }
+
+    /**
+     * Suspend a process instance (temporary pause)
+     */
+    @PostMapping("/instances/{id}/suspend")
+    public ResponseEntity<ProcessInstanceDTO> suspendProcess(
+            @PathVariable Long id,
+            @RequestParam String reason,
+            @RequestParam String userId) {
+        log.info("POST /api/processes/instances/{}/suspend - Suspending process by user {}", id, userId);
+        ProcessInstanceDTO result = processEngine.suspendProcess(id, reason, userId);
+        return ResponseEntity.ok(result);
+    }
+
+    /**
+     * Resume a suspended process instance
+     */
+    @PostMapping("/instances/{id}/resume")
+    public ResponseEntity<ProcessInstanceDTO> resumeProcess(
+            @PathVariable Long id,
+            @RequestParam String userId) {
+        log.info("POST /api/processes/instances/{}/resume - Resuming process by user {}", id, userId);
+        ProcessInstanceDTO result = processEngine.resumeProcess(id, userId);
+        return ResponseEntity.ok(result);
+    }
 }

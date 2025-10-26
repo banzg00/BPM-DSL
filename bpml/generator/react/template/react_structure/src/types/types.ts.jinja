@@ -39,6 +39,9 @@ export interface ProcessInstance {
   startedAt: string;
   completedAt?: string;
   terminatedReason?: string;
+  suspendedAt?: string;
+  suspendedReason?: string;
+  suspendedBy?: string;
 }
 
 export interface TaskInstance {

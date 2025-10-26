@@ -48,6 +48,15 @@ public class ProcessInstance {
     @Column(name = "terminated_reason")
     private String terminatedReason;
 
+    @Column(name = "suspended_at")
+    private LocalDateTime suspendedAt;
+
+    @Column(name = "suspended_reason")
+    private String suspendedReason;
+
+    @Column(name = "suspended_by")
+    private String suspendedBy;
+
     @PrePersist
     protected void onCreate() {
         if (startedAt == null) {
@@ -62,6 +71,7 @@ public class ProcessInstance {
         RUNNING,
         COMPLETED,
         TERMINATED,
+        SUSPENDED,
         ERROR
     }
 }

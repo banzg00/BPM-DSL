@@ -14,9 +14,10 @@ import { TransitionHistory } from '../../types/types';
 
 interface ProcessTimelineProps {
   processInstanceId: number;
+  refreshKey?: number;
 }
 
-const ProcessTimeline: React.FC<ProcessTimelineProps> = ({ processInstanceId }) => {
+const ProcessTimeline: React.FC<ProcessTimelineProps> = ({ processInstanceId, refreshKey }) => {
   const [history, setHistory] = useState<TransitionHistory[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -34,7 +35,7 @@ const ProcessTimeline: React.FC<ProcessTimelineProps> = ({ processInstanceId }) 
         setError('Failed to load process history');
         setLoading(false);
       });
-  }, [processInstanceId]);
+  }, [processInstanceId, refreshKey]);
 
   if (loading) {
     return (
@@ -59,7 +60,7 @@ const ProcessTimeline: React.FC<ProcessTimelineProps> = ({ processInstanceId }) 
   }
 
   return (
-    <Timeline position="alternate">
+    <Timeline position="alternate-reverse">
       {history.map((item, index) => (
         <TimelineItem key={item.id}>
           <TimelineOppositeContent color="text.secondary">
