@@ -68,19 +68,31 @@ def generate_entity_components(context, filters, model, output_path, overwrite):
 
     # Collect all entities from all processes
     all_entities = []
+    entity_to_processes = {}  # Map entity name to list of processes that use it
+
     for process in model.processes:
         if hasattr(process, 'elements') and process.elements:
             entities = [elem for elem in process.elements if elem.__class__.__name__ == 'Entity']
-            all_entities.extend(entities)
+
+            # Track which processes use which entities
+            for entity in entities:
+                if entity.name not in entity_to_processes:
+                    entity_to_processes[entity.name] = []
+                    all_entities.append(entity)
+                entity_to_processes[entity.name].append(process)
 
     # Generate components for each entity
     for entity in all_entities:
+        # Get processes that use this entity
+        processes_using_entity = entity_to_processes.get(entity.name, [])
+
         context['entity'] = entity
         context['entity_name'] = entity.name
         context['entity_name_cap'] = capitalize_str(entity.name)
         context['entity_name_lower'] = lower_first_str(entity.name)
         context['entity_name_dash'] = dash_case(entity.name)
         context['attributes'] = entity.attributes if hasattr(entity, 'attributes') else []
+        context['processes_using_entity'] = processes_using_entity
 
         # Run Jinja generator for entity components
         pages_folder = os.path.join(output_path, 'src/pages')
@@ -116,6 +128,15 @@ def generate_process_components(context, filters, model, output_path, overwrite)
     """Generate process management components for each process"""
     process_template = os.path.join(THIS_FOLDER, 'template/process_components')
 
+    # Collect all entities from all processes for linking
+    all_entities = []
+    for proc in model.processes:
+        if hasattr(proc, 'elements') and proc.elements:
+            entities = [elem for elem in proc.elements if elem.__class__.__name__ == 'Entity']
+            for entity in entities:
+                if entity.name not in [e.name for e in all_entities]:
+                    all_entities.append(entity)
+
     # Generate components for each process
     for process in model.processes:
         # Extract process elements
@@ -123,6 +144,7 @@ def generate_process_components(context, filters, model, output_path, overwrite)
         process_roles = []
         process_steps = []
         process_transitions = []
+        process_entities = []
 
         if hasattr(process, 'elements') and process.elements:
             for elem in process.elements:
@@ -135,6 +157,8 @@ def generate_process_components(context, filters, model, output_path, overwrite)
                     process_steps.append(elem)
                 elif elem_type == 'Transition':
                     process_transitions.append(elem)
+                elif elem_type == 'Entity':
+                    process_entities.append(elem)
 
         # Update context with process-specific data
         context['process'] = process
@@ -146,6 +170,7 @@ def generate_process_components(context, filters, model, output_path, overwrite)
         context['process_roles'] = process_roles
         context['process_steps'] = process_steps
         context['process_transitions'] = process_transitions
+        context['entities'] = all_entities  # Pass all entities for linked entity display
 
         # Generate process components
         components_folder = os.path.join(output_path, 'src/components/processes')

@@ -7,10 +7,13 @@ import {
   Paper,
   Box,
   Grid,
-  Dialog
+  Dialog,
+  Menu,
+  MenuItem
 } from '@mui/material';
 import {{ entity_name }}Service from '../../services/{{ entity_name }}Service';
 import {{ entity_name }}Dialog from './{{ entity_name }}Dialog';
+import StartProcessDialog from '../../components/shared/StartProcessDialog';
 import { {{ entity_name }} } from '../../types/types';
 
 const {{ entity_name }}Page: React.FC = () => {
@@ -18,6 +21,9 @@ const {{ entity_name }}Page: React.FC = () => {
   const navigate = useNavigate();
   const [{{ entity_name_lower }}, set{{ entity_name }}] = useState<{{ entity_name }} | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [processMenuAnchor, setProcessMenuAnchor] = useState<null | HTMLElement>(null);
+  const [isStartProcessDialogOpen, setIsStartProcessDialogOpen] = useState(false);
+  const [selectedProcess, setSelectedProcess] = useState<string>('');
 
   useEffect(() => {
     if (id) {
@@ -52,6 +58,32 @@ const {{ entity_name }}Page: React.FC = () => {
     navigate('/{{ entity_name_lower }}');
   };
 
+  const handleStartProcessClick = (event: React.MouseEvent<HTMLElement>) => {
+    setProcessMenuAnchor(event.currentTarget);
+  };
+
+  const handleProcessMenuClose = () => {
+    setProcessMenuAnchor(null);
+  };
+
+  const handleProcessSelect = (processName: string) => {
+    setSelectedProcess(processName);
+    setProcessMenuAnchor(null);
+    setIsStartProcessDialogOpen(true);
+  };
+
+  const handleStartProcessDialogClose = () => {
+    setIsStartProcessDialogOpen(false);
+    setSelectedProcess('');
+  };
+
+  // Define which processes can be started for this entity type
+  const availableProcesses = [
+    {% for process in processes_using_entity %}
+    '{{ process.name }}',
+    {% endfor %}
+  ];
+
   if (!{{ entity_name_lower }}) {
     return <Container><Typography>Loading...</Typography></Container>;
   }
@@ -67,6 +99,16 @@ const {{ entity_name }}Page: React.FC = () => {
             <Button onClick={handleBack} sx={{ "{{" }}  mr: 1  {{ "}}" }}>
               Back
             </Button>
+            {% if processes_using_entity %}
+            <Button
+              variant="contained"
+              color="primary"
+              onClick={handleStartProcessClick}
+              sx={{ "{{" }}  mr: 1  {{ "}}" }}
+            >
+              Start Process
+            </Button>
+            {% endif %}
             <Button variant="outlined" onClick={handleEdit} sx={{ "{{" }}  mr: 1  {{ "}}" }}>
               Edit
             </Button>
@@ -103,6 +145,35 @@ const {{ entity_name }}Page: React.FC = () => {
       <Dialog open={isDialogOpen} onClose={handleDialogClose} maxWidth="sm" fullWidth>
         <{{ entity_name }}Dialog id={parseInt(id!)} onClose={handleDialogClose} />
       </Dialog>
+
+      {% if processes_using_entity %}
+      {/* Process Selection Menu */}
+      <Menu
+        anchorEl={processMenuAnchor}
+        open={Boolean(processMenuAnchor)}
+        onClose={handleProcessMenuClose}
+      >
+        {availableProcesses.length > 0 ? (
+          availableProcesses.map((processName) => (
+            <MenuItem key={processName} onClick={() => handleProcessSelect(processName)}>
+              {processName}
+            </MenuItem>
+          ))
+        ) : (
+          <MenuItem disabled>No processes available</MenuItem>
+        )}
+      </Menu>
+
+      {/* Start Process Dialog */}
+      <Dialog open={isStartProcessDialogOpen} onClose={handleStartProcessDialogClose} maxWidth="sm" fullWidth>
+        <StartProcessDialog
+          processName={selectedProcess}
+          entityId={parseInt(id!)}
+          entityType="{{ entity_name }}"
+          onClose={handleStartProcessDialogClose}
+        />
+      </Dialog>
+      {% endif %}
     </Container>
   );
 };

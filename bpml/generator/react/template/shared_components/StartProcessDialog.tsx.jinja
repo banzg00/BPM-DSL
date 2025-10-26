@@ -12,9 +12,16 @@ import ProcessInstanceService from '../../services/ProcessInstanceService';
 interface StartProcessDialogProps {
   processName: string;
   onClose: () => void;
+  entityId?: number;
+  entityType?: string;
 }
 
-const StartProcessDialog: React.FC<StartProcessDialogProps> = ({ processName, onClose }) => {
+const StartProcessDialog: React.FC<StartProcessDialogProps> = ({
+  processName,
+  onClose,
+  entityId,
+  entityType
+}) => {
   const [initiatedBy, setInitiatedBy] = useState('');
   const [error, setError] = useState('');
 
@@ -24,9 +31,17 @@ const StartProcessDialog: React.FC<StartProcessDialogProps> = ({ processName, on
       return;
     }
 
+    const processVariables: Record<string, any> = {};
+
+    // If entity information is provided, include it in process variables
+    if (entityId && entityType) {
+      processVariables[`${entityType.toLowerCase()}Id`] = entityId;
+      processVariables.entityType = entityType;
+    }
+
     ProcessInstanceService.startProcess(processName, {
       initiatedBy,
-      processVariables: {}
+      processVariables
     })
     .then(() => {
       onClose();
@@ -40,6 +55,12 @@ const StartProcessDialog: React.FC<StartProcessDialogProps> = ({ processName, on
     <>
       <DialogTitle>Start New {processName} Process</DialogTitle>
       <DialogContent>
+        {entityId && entityType && (
+          <Typography variant="body2" color="text.secondary" sx={{ "{{" }}  mb: 2, p: 1, bgcolor: 'action.hover', borderRadius: 1  {{ "}}" }}>
+            This process will be linked to <strong>{entityType} #{entityId}</strong>
+          </Typography>
+        )}
+
         <TextField
           label="Initiated By (User ID)"
           placeholder="Enter your user ID (e.g., admin, user1)"

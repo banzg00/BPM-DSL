@@ -221,6 +221,28 @@ const ProcessInstancePage: React.FC = () => {
                   {instance.initiatedBy}
                 </Typography>
               </Box>
+              {/* Show linked entity if available */}
+              {instance.processVariables && Object.keys(instance.processVariables).length > 0 && (
+                <>
+                  {% for entity in entities %}
+                  {instance.processVariables.{{ entity.name | lower }}Id && (
+                    <Box>
+                      <Typography variant="subtitle2" color="text.secondary">
+                        Related {{ entity.name }}
+                      </Typography>
+                      <Button
+                        variant="text"
+                        size="small"
+                        onClick={() => navigate(`/{{ entity.name | lower }}/${instance.processVariables.{{ entity.name | lower }}Id}`)}
+                        sx={{ "{{" }}  justifyContent: 'flex-start', p: 0, textTransform: 'none'  {{ "}}" }}
+                      >
+                        {{ entity.name }} #{instance.processVariables.{{ entity.name | lower }}Id}
+                      </Button>
+                    </Box>
+                  )}
+                  {% endfor %}
+                </>
+              )}
               <Box>
                 <Typography variant="subtitle2" color="text.secondary">
                   Started At
