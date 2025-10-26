@@ -71,8 +71,9 @@ export interface TransitionHistory {
   fromState: string;
   toState: string;
   executedBy: string;
+  executedByRole?: string;
+  transitionData?: Record<string, any>;
   executedAt: string;
-  comments?: string;
 }
 
 export interface StartProcessRequest {

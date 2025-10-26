@@ -35,22 +35,22 @@ public class TransitionHistory {
     @Column(name = "to_state", nullable = false)
     private String toState;
 
-    @Column(name = "performed_by")
-    private String performedBy;
+    @Column(name = "executed_by")
+    private String executedBy;
 
-    @Column(name = "performed_by_role")
-    private String performedByRole;
+    @Column(name = "executed_by_role")
+    private String executedByRole;
 
     @Column(name = "transition_data", columnDefinition = "TEXT")
     private String transitionData; // JSON snapshot of relevant data
 
-    @Column(name = "timestamp", nullable = false)
-    private LocalDateTime timestamp;
+    @Column(name = "executed_at", nullable = false)
+    private LocalDateTime executedAt;
 
     @PrePersist
     protected void onCreate() {
-        if (timestamp == null) {
-            timestamp = LocalDateTime.now();
+        if (executedAt == null) {
+            executedAt = LocalDateTime.now();
         }
     }
 }

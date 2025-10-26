@@ -114,10 +114,10 @@ public class ProcessEngine {
                 .transitionName(transitionName)
                 .fromState(fromState)
                 .toState(toState)
-                .performedBy(request.getUserId())
-                .performedByRole(request.getUserRole())
+                .executedBy(request.getUserId())
+                .executedByRole(request.getUserRole())
                 .transitionData(serializeToJson(request.getTransitionData()))
-                .timestamp(LocalDateTime.now())
+                .executedAt(LocalDateTime.now())
                 .build();
         transitionHistoryRepository.save(history);
 
@@ -192,7 +192,7 @@ public class ProcessEngine {
         log.info("Getting history for process instance {}", processInstanceId);
 
         List<TransitionHistory> history = transitionHistoryRepository
-                .findByProcessInstanceIdOrderByTimestampAsc(processInstanceId);
+                .findByProcessInstanceIdOrderByExecutedAtAsc(processInstanceId);
 
         return history.stream()
                 .map(this::mapToTransitionHistoryDTO)
@@ -331,10 +331,10 @@ public class ProcessEngine {
                 .transitionName(history.getTransitionName())
                 .fromState(history.getFromState())
                 .toState(history.getToState())
-                .performedBy(history.getPerformedBy())
-                .performedByRole(history.getPerformedByRole())
+                .executedBy(history.getExecutedBy())
+                .executedByRole(history.getExecutedByRole())
                 .transitionData(parseDefinitionJson(history.getTransitionData()))
-                .timestamp(history.getTimestamp())
+                .executedAt(history.getExecutedAt())
                 .build();
     }
 }

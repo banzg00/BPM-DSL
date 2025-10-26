@@ -12,7 +12,7 @@ import {
 } from '@mui/material';
 import ProcessInstanceService from '../../../services/ProcessInstanceService';
 import TaskService from '../../../services/TaskService';
-import { ProcessInstance, TaskInstance, AvailableTransition } from '../../../types/types';
+import { ProcessInstance, ProcessStatus, TaskInstance, AvailableTransition } from '../../../types/types';
 import ProcessTimeline from '../../shared/ProcessTimeline';
 import StateTransitionDialog from '../../shared/StateTransitionDialog';
 
@@ -61,6 +61,21 @@ const ProcessInstancePage: React.FC = () => {
     navigate('/process/{{ process_name_lower }}/instances');
   };
 
+  const getStatusColor = (status: ProcessStatus) => {
+    switch (status) {
+      case ProcessStatus.RUNNING:
+        return 'primary';
+      case ProcessStatus.COMPLETED:
+        return 'success';
+      case ProcessStatus.TERMINATED:
+        return 'error';
+      case ProcessStatus.SUSPENDED:
+        return 'warning';
+      default:
+        return 'default';
+    }
+  };
+
   if (!instance) {
     return <Container><Typography>Loading...</Typography></Container>;
   }
@@ -96,7 +111,11 @@ const ProcessInstancePage: React.FC = () => {
                 <Typography variant="subtitle2" color="text.secondary">
                   Status
                 </Typography>
-                <Chip label={instance.status} color="primary" size="small" />
+                <Chip
+                  label={instance.status}
+                  color={getStatusColor(instance.status)}
+                  size="small"
+                />
               </Box>
               <Box>
                 <Typography variant="subtitle2" color="text.secondary">

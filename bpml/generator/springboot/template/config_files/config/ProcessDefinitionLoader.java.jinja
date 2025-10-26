@@ -56,6 +56,23 @@ public class ProcessDefinitionLoader implements CommandLineRunner {
             {% endfor %}
             definition.put("states", states);
 
+            // Final states (states with no outgoing transitions)
+            List<String> finalStates = new ArrayList<>();
+            {% set all_from_states = [] %}
+            {% for elem in process.elements %}
+            {% if elem.__class__.__name__ == 'Transition' %}
+            {% set _ = all_from_states.append(elem.from_state.name) %}
+            {% endif %}
+            {% endfor %}
+            {% for elem in process.elements %}
+            {% if elem.__class__.__name__ == 'State' %}
+            {% if elem.name not in all_from_states %}
+            finalStates.add("{{ elem.name }}");
+            {% endif %}
+            {% endif %}
+            {% endfor %}
+            definition.put("finalStates", finalStates);
+
             // Roles
             List<Map<String, String>> roles = new ArrayList<>();
             {% for elem in process.elements %}
@@ -71,8 +88,8 @@ public class ProcessDefinitionLoader implements CommandLineRunner {
             {% if elem.__class__.__name__ == 'Transition' %}
             Map<String, Object> transition{{ loop.index }} = new HashMap<>();
             transition{{ loop.index }}.put("name", "{{ elem.name }}");
-            transition{{ loop.index }}.put("from", "{{ elem.from_state.name }}");
-            transition{{ loop.index }}.put("to", "{{ elem.to_state.name }}");
+            transition{{ loop.index }}.put("fromState", "{{ elem.from_state.name }}");
+            transition{{ loop.index }}.put("toState", "{{ elem.to_state.name }}");
             {% if elem.role %}
             transition{{ loop.index }}.put("role", "{{ elem.role.name }}");
             {% endif %}

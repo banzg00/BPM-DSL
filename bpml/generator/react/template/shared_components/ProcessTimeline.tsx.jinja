@@ -8,7 +8,7 @@ import {
   TimelineDot,
   TimelineOppositeContent
 } from '@mui/lab';
-import { Typography, Paper } from '@mui/material';
+import { Typography, Paper, CircularProgress, Alert } from '@mui/material';
 import ProcessInstanceService from '../../services/ProcessInstanceService';
 import { TransitionHistory } from '../../types/types';
 
@@ -18,12 +18,37 @@ interface ProcessTimelineProps {
 
 const ProcessTimeline: React.FC<ProcessTimelineProps> = ({ processInstanceId }) => {
   const [history, setHistory] = useState<TransitionHistory[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    ProcessInstanceService.getProcessHistory(processInstanceId).then((data) => {
-      setHistory(data);
-    });
+    setLoading(true);
+    setError(null);
+    ProcessInstanceService.getProcessHistory(processInstanceId)
+      .then((data) => {
+        setHistory(data);
+        setLoading(false);
+      })
+      .catch((err) => {
+        console.error('Failed to load process history:', err);
+        setError('Failed to load process history');
+        setLoading(false);
+      });
   }, [processInstanceId]);
+
+  if (loading) {
+    return (
+      <div style={{ "{{" }} display: 'flex', justifyContent: 'center', padding: '20px' {{ "}}" }}>
+        <CircularProgress />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <Alert severity="error">{error}</Alert>
+    );
+  }
 
   if (history.length === 0) {
     return (
@@ -54,12 +79,8 @@ const ProcessTimeline: React.FC<ProcessTimelineProps> = ({ processInstanceId }) 
               </Typography>
               <Typography variant="caption" color="text.secondary">
                 By: {item.executedBy}
+                {item.executedByRole && ` (${item.executedByRole})`}
               </Typography>
-              {item.comments && (
-                <Typography variant="body2" sx={{ "{{" }}  mt: 1  {{ "}}" }}>
-                  {item.comments}
-                </Typography>
-              )}
             </Paper>
           </TimelineContent>
         </TimelineItem>
