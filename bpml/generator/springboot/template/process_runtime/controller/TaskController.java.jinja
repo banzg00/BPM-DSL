@@ -21,6 +21,16 @@ public class TaskController {
     private final TaskService taskService;
 
     /**
+     * Get all tasks
+     */
+    @GetMapping("/all")
+    public ResponseEntity<List<TaskInstanceDTO>> getAll() {
+        log.info("GET /api/tasks/all - Fetching all tasks");
+        List<TaskInstanceDTO> tasks = taskService.getAll();
+        return ResponseEntity.ok(tasks);
+    }
+
+    /**
      * Get task by ID
      */
     @GetMapping("/{id}")

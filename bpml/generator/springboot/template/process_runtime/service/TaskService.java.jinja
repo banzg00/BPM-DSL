@@ -26,6 +26,18 @@ public class TaskService {
     private final ObjectMapper objectMapper;
 
     /**
+     * Get all tasks
+     */
+    @Transactional(readOnly = true)
+    public List<TaskInstanceDTO> getAll() {
+        log.info("Fetching all task instances");
+        List<TaskInstance> tasks = repository.findAll();
+        return tasks.stream()
+                .map(this::mapToDTO)
+                .collect(Collectors.toList());
+    }
+
+    /**
      * Get task by ID
      */
     @Transactional(readOnly = true)
