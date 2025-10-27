@@ -53,7 +53,7 @@ const TaskList: React.FC = () => {
     switch (status) {
       case TaskStatus.PENDING:
         return 'warning';
-      case TaskStatus.CLAIMED:
+      case TaskStatus.IN_PROGRESS:
         return 'info';
       case TaskStatus.COMPLETED:
         return 'success';
@@ -178,7 +178,7 @@ const TaskList: React.FC = () => {
                       Claim
                     </Button>
                   )}
-                  {task.status === TaskStatus.CLAIMED && (
+                  {task.status === TaskStatus.IN_PROGRESS && (
                     <Button
                       size="small"
                       variant="contained"

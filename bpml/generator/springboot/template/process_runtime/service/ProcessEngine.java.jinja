@@ -112,6 +112,22 @@ public class ProcessEngine {
                     request.getUserRole(), transitionName, requiredRole));
         }
 
+        // Check if all tasks for current state are completed
+        List<TaskInstance> incompleteTasks = taskInstanceRepository.findByProcessInstanceId(processInstanceId)
+                .stream()
+                .filter(task -> task.getStatus() != TaskInstance.TaskStatus.COMPLETED &&
+                               task.getStatus() != TaskInstance.TaskStatus.CANCELLED)
+                .collect(Collectors.toList());
+
+        if (!incompleteTasks.isEmpty()) {
+            String taskNames = incompleteTasks.stream()
+                    .map(TaskInstance::getTaskName)
+                    .collect(Collectors.joining(", "));
+            throw new IllegalStateException(String.format(
+                    "Cannot execute transition. %d task(s) must be completed first: %s",
+                    incompleteTasks.size(), taskNames));
+        }
+
         // Record transition history
         TransitionHistory history = TransitionHistory.builder()
                 .processInstanceId(processInstanceId)

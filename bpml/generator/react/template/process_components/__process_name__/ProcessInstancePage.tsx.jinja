@@ -421,6 +421,7 @@ const ProcessInstancePage: React.FC = () => {
           <StateTransitionDialog
             processInstanceId={parseInt(id!)}
             transition={selectedTransition}
+            tasks={tasks}
             onClose={handleTransitionDialogClose}
           />
         </Dialog>
