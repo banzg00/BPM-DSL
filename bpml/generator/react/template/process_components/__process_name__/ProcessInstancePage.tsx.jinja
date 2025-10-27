@@ -144,7 +144,7 @@ const ProcessInstancePage: React.FC = () => {
     switch (status) {
       case TaskStatus.PENDING:
         return 'warning';
-      case TaskStatus.CLAIMED:
+      case TaskStatus.IN_PROGRESS:
         return 'info';
       case TaskStatus.COMPLETED:
         return 'success';
@@ -381,7 +381,7 @@ const ProcessInstancePage: React.FC = () => {
                       {task.taskName}
                     </Typography>
                     <Box display="flex" gap={2} mt={1}>
-                      <Chip label={task.status} color={getTaskStatusColor(task.status)} size="small" />
+                      <Chip label={task.status.replace("_", " ")} color={getTaskStatusColor(task.status)} size="small" />
                       <Typography variant="caption" color="text.secondary">
                         Role: {task.assignedRole}
                       </Typography>

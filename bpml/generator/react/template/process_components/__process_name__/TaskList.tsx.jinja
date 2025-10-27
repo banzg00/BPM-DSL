@@ -114,7 +114,7 @@ const TaskList: React.FC = () => {
           >
             <MenuItem value="all">All</MenuItem>
             <MenuItem value={TaskStatus.PENDING}>Pending</MenuItem>
-            <MenuItem value={TaskStatus.CLAIMED}>Claimed</MenuItem>
+            <MenuItem value={TaskStatus.IN_PROGRESS}>In progress</MenuItem>
             <MenuItem value={TaskStatus.COMPLETED}>Completed</MenuItem>
             <MenuItem value={TaskStatus.CANCELLED}>Cancelled</MenuItem>
           </Select>
@@ -160,7 +160,7 @@ const TaskList: React.FC = () => {
                 <TableCell>{task.taskName}</TableCell>
                 <TableCell>
                   <Chip
-                    label={task.status}
+                    label={task.status.replace("_", " ")}
                     color={getStatusColor(task.status)}
                     size="small"
                   />
