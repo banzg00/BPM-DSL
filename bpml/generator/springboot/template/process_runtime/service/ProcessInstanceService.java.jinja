@@ -120,6 +120,9 @@ public class ProcessInstanceService {
                 .startedAt(instance.getStartedAt())
                 .completedAt(instance.getCompletedAt())
                 .terminatedReason(instance.getTerminatedReason())
+                .suspendedAt(instance.getSuspendedAt())
+                .suspendedReason(instance.getSuspendedReason())
+                .suspendedBy(instance.getSuspendedBy())
                 .build();
     }
 

@@ -279,8 +279,9 @@ const ProcessInstancePage: React.FC = () => {
                       Suspended At
                     </Typography>
                     <Typography variant="body1">
-                      {new Date(instance?.suspendedAt || "").toLocaleString() ||
-                        "N/A"}
+                      {instance.suspendedAt
+                        ? new Date(instance.suspendedAt).toLocaleString()
+                        : "N/A"}
                     </Typography>
                   </Box>
                   <Box>
@@ -291,18 +292,25 @@ const ProcessInstancePage: React.FC = () => {
                       {instance.suspendedReason || "N/A"}
                     </Typography>
                   </Box>
+                  <Box>
+                    <Typography variant="subtitle2" color="text.secondary">
+                      Suspended By
+                    </Typography>
+                    <Typography variant="body1">
+                      {instance.suspendedBy || "N/A"}
+                    </Typography>
+                  </Box>
                 </>
               )}
               {instance.status === ProcessStatus.COMPLETED && (
                 <Box>
-                  {instance.status === ProcessStatus.COMPLETED && (
-                    <Typography variant="subtitle2" color="text.secondary">
-                      Completed At
-                    </Typography>
-                  )}
+                  <Typography variant="subtitle2" color="text.secondary">
+                    Completed At
+                  </Typography>
                   <Typography variant="body1">
-                    {new Date(instance?.completedAt || "").toLocaleString() ||
-                      "N/A"}
+                    {instance.completedAt
+                      ? new Date(instance.completedAt).toLocaleString()
+                      : "N/A"}
                   </Typography>
                 </Box>
               )}
@@ -313,8 +321,9 @@ const ProcessInstancePage: React.FC = () => {
                       Terminated At
                     </Typography>
                     <Typography variant="body1">
-                      {new Date(instance?.completedAt || "").toLocaleString() ||
-                        "N/A"}
+                      {instance.completedAt
+                        ? new Date(instance.completedAt).toLocaleString()
+                        : "N/A"}
                     </Typography>
                   </Box>
                   <Box>
