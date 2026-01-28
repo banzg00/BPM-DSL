@@ -1,0 +1,121 @@
+import React, { useState } from 'react';
+import {
+  Container,
+  Typography,
+  Box,
+  Button,
+  Card,
+  CardContent,
+  CardActions,
+  Grid,
+  Dialog
+} from '@mui/material';
+import PlayArrowIcon from '@mui/icons-material/PlayArrow';
+import { useNavigate } from 'react-router-dom';
+import StartMultiEntityProcessDialog from './shared/StartMultiEntityProcessDialog';
+
+const StartProcessPage: React.FC = () => {
+  const navigate = useNavigate();
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [selectedProcess, setSelectedProcess] = useState<string>('');
+  const [selectedAllowedEntities, setSelectedAllowedEntities] = useState<string[]>([]);
+
+  // Available processes with their allowed entity types
+  const processes = [
+    {% for process in processes %}
+    {
+      name: '{{ process.name }}',
+      description: '{{ process.name }} process',
+      allowedEntityTypes: [
+        {% if process.elements %}
+        {% for elem in process.elements %}
+        {% if elem.__class__.__name__ == 'Entity' %}
+        '{{ elem.name }}',
+        {% endif %}
+        {% endfor %}
+        {% endif %}
+      ],
+    },
+    {% endfor %}
+  ];
+
+  const handleStartProcess = (processName: string, allowedEntityTypes: string[]) => {
+    setSelectedProcess(processName);
+    setSelectedAllowedEntities(allowedEntityTypes);
+    setIsDialogOpen(true);
+  };
+
+  const handleDialogClose = () => {
+    setIsDialogOpen(false);
+    setSelectedProcess('');
+    setSelectedAllowedEntities([]);
+  };
+
+  return (
+    <Container maxWidth="lg">
+      <Box sx={{ "{{" }}  mt: 4, mb: 4  {{ "}}" }}>
+        <Typography variant="h4" component="h1" gutterBottom>
+          Start New Process
+        </Typography>
+        <Typography variant="body1" color="text.secondary" paragraph>
+          Select a process below and link multiple entities to get started
+        </Typography>
+
+        <Grid container spacing={3} sx={{ "{{" }}  mt: 2  {{ "}}" }}>
+          {processes.map((process) => (
+            <Grid item xs={12} sm={6} md={4} key={process.name}>
+              <Card>
+                <CardContent>
+                  <Typography variant="h6" component="h2">
+                    {process.name}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary" sx={{ "{{" }}  mb: 1  {{ "}}" }}>
+                    {process.description}
+                  </Typography>
+                  {process.allowedEntityTypes.length > 0 && (
+                    <Typography variant="caption" color="text.secondary">
+                      Entities: {process.allowedEntityTypes.join(', ')}
+                    </Typography>
+                  )}
+                </CardContent>
+                <CardActions>
+                  <Button
+                    size="small"
+                    color="primary"
+                    startIcon={<PlayArrowIcon />}
+                    onClick={() => handleStartProcess(process.name, process.allowedEntityTypes)}
+                  >
+                    Start Process
+                  </Button>
+                </CardActions>
+              </Card>
+            </Grid>
+          ))}
+        </Grid>
+
+        <Box sx={{ "{{" }}  mt: 4  {{ "}}" }}>
+          <Button variant="outlined" onClick={() => navigate('/')}>
+            Back to Home
+          </Button>
+        </Box>
+      </Box>
+
+      <Dialog
+        open={isDialogOpen}
+        onClose={handleDialogClose}
+        maxWidth="md"
+        fullWidth
+      >
+        {selectedProcess && (
+          <StartMultiEntityProcessDialog
+            processName={selectedProcess}
+            onClose={handleDialogClose}
+            allowedEntityTypes={selectedAllowedEntities}
+          />
+        )}
+      </Dialog>
+    </Container>
+  );
+};
+
+export default StartProcessPage;

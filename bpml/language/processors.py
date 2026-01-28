@@ -73,15 +73,18 @@ def _validate_process_structure(process):
         step_names.add(step.name)
 
         # Validate step references
-        if step.role.name not in role_names:
+        if step.role and step.role.name not in role_names:
             raise TextXSemanticError(
                 f"Step '{step.name}' references unknown role '{step.role.name}' in process '{process.name}'"
             )
 
-        if step.entity.name not in entity_names:
-            raise TextXSemanticError(
-                f"Step '{step.name}' references unknown entity '{step.entity.name}' in process '{process.name}'"
-            )
+        # Validate entities (now optional and plural)
+        if hasattr(step, 'entities') and step.entities:
+            for entity in step.entities:
+                if entity.name not in entity_names:
+                    raise TextXSemanticError(
+                        f"Step '{step.name}' references unknown entity '{entity.name}' in process '{process.name}'"
+                    )
 
     # Validate flow
     if hasattr(process, "flow") and process.flow:

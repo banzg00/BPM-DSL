@@ -42,8 +42,8 @@ public class TaskInstance {
     @Column(name = "entity_id")
     private Long entityId;
 
-    @Column(name = "entity_type")
-    private String entityType;
+    @Column(name = "entity_types", columnDefinition = "TEXT")
+    private String entityTypes; // Comma-separated list of entity types this task affects
 
     @Column(name = "task_data", columnDefinition = "TEXT")
     private String taskData; // JSON for additional task-specific data

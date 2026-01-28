@@ -242,27 +242,26 @@ const ProcessInstancePage: React.FC = () => {
                   {instance.initiatedBy}
                 </Typography>
               </Box>
-              {/* Show linked entity if available */}
-              {instance.processVariables && Object.keys(instance.processVariables).length > 0 && (
-                <>
-                  {% for entity in entities %}
-                  {instance.processVariables.{{ entity.name | lower }}Id && (
-                    <Box>
-                      <Typography variant="subtitle2" color="text.secondary">
-                        Related {{ entity.name }}
-                      </Typography>
+              {/* Show linked entities */}
+              {instance.linkedEntities && instance.linkedEntities.length > 0 && (
+                <Box>
+                  <Typography variant="subtitle2" color="text.secondary">
+                    Related Entities
+                  </Typography>
+                  <Box display="flex" flexDirection="column" gap={1} mt={1}>
+                    {instance.linkedEntities.map((entityRef, index) => (
                       <Button
+                        key={`${entityRef.entityType}-${entityRef.entityId}-${index}`}
                         variant="text"
                         size="small"
-                        onClick={() => navigate(`/{{ entity.name | lower }}/${instance.processVariables.{{ entity.name | lower }}Id}`)}
+                        onClick={() => navigate(`/${entityRef.entityType.toLowerCase()}/${entityRef.entityId}`)}
                         sx={{ "{{" }}  justifyContent: 'flex-start', p: 0, textTransform: 'none'  {{ "}}" }}
                       >
-                        {{ entity.name }} #{instance.processVariables.{{ entity.name | lower }}Id}
+                        {entityRef.entityType} #{entityRef.entityId}
                       </Button>
-                    </Box>
-                  )}
-                  {% endfor %}
-                </>
+                    ))}
+                  </Box>
+                </Box>
               )}
               <Box>
                 <Typography variant="subtitle2" color="text.secondary">

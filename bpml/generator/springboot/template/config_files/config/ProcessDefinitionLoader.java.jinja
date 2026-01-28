@@ -103,20 +103,26 @@ public class ProcessDefinitionLoader implements CommandLineRunner {
 
             // Steps (tasks)
             List<Map<String, Object>> steps = new ArrayList<>();
+            {% set step_counter = namespace(value=0) %}
             {% for elem in process.elements %}
             {% if elem.__class__.__name__ == 'Step' %}
-            Map<String, Object> step{{ loop.index }} = new HashMap<>();
-            step{{ loop.index }}.put("name", "{{ elem.name }}");
+            {% set step_counter.value = step_counter.value + 1 %}
+            Map<String, Object> step{{ step_counter.value }} = new HashMap<>();
+            step{{ step_counter.value }}.put("name", "{{ elem.name }}");
             {% if elem.role %}
-            step{{ loop.index }}.put("role", "{{ elem.role.name }}");
+            step{{ step_counter.value }}.put("role", "{{ elem.role.name }}");
             {% endif %}
-            {% if elem.entity %}
-            step{{ loop.index }}.put("entity", "{{ elem.entity.name }}");
+            {% if elem.entities %}
+            List<String> entities{{ step_counter.value }} = new ArrayList<>();
+            {% for entity in elem.entities %}
+            entities{{ step_counter.value }}.add("{{ entity.name }}");
+            {% endfor %}
+            step{{ step_counter.value }}.put("entities", entities{{ step_counter.value }});
             {% endif %}
             {% if elem.operation %}
-            step{{ loop.index }}.put("operation", "{{ elem.operation }}");
+            step{{ step_counter.value }}.put("operation", "{{ elem.operation }}");
             {% endif %}
-            steps.add(step{{ loop.index }});
+            steps.add(step{{ step_counter.value }});
             {% endif %}
             {% endfor %}
             definition.put("steps", steps);

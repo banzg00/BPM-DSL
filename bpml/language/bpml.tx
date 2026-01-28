@@ -58,7 +58,7 @@ Transition:
 Step:
     'step' name=ID
     ('by' role=[Role])?
-    ('affects' entity=[Entity])?
+    ('affects' entities+=[Entity][','])?
 ;
 
 Flow:

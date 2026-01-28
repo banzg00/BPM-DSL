@@ -197,6 +197,12 @@ public class TaskService {
     }
 
     private TaskInstanceDTO mapToDTO(TaskInstance task) {
+        // Parse entityTypes from comma-separated string to list
+        List<String> entityTypesList = null;
+        if (task.getEntityTypes() != null && !task.getEntityTypes().isEmpty()) {
+            entityTypesList = List.of(task.getEntityTypes().split(","));
+        }
+
         return TaskInstanceDTO.builder()
                 .id(task.getId())
                 .processInstanceId(task.getProcessInstanceId())
@@ -205,7 +211,7 @@ public class TaskService {
                 .assignedUser(task.getAssignedUser())
                 .status(task.getStatus())
                 .entityId(task.getEntityId())
-                .entityType(task.getEntityType())
+                .entityTypes(entityTypesList)
                 .taskData(parseJson(task.getTaskData()))
                 .createdAt(task.getCreatedAt())
                 .claimedAt(task.getClaimedAt())

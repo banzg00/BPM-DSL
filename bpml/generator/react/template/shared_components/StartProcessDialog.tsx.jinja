@@ -5,22 +5,23 @@ import {
   DialogContent,
   DialogTitle,
   TextField,
-  Typography
+  Typography,
+  Box,
+  Chip
 } from '@mui/material';
 import ProcessInstanceService from '../../services/ProcessInstanceService';
+import { EntityReference } from '../../types/types';
 
 interface StartProcessDialogProps {
   processName: string;
   onClose: () => void;
-  entityId?: number;
-  entityType?: string;
+  entities?: EntityReference[];
 }
 
 const StartProcessDialog: React.FC<StartProcessDialogProps> = ({
   processName,
   onClose,
-  entityId,
-  entityType
+  entities
 }) => {
   const [initiatedBy, setInitiatedBy] = useState('');
   const [error, setError] = useState('');
@@ -31,17 +32,10 @@ const StartProcessDialog: React.FC<StartProcessDialogProps> = ({
       return;
     }
 
-    const processVariables: Record<string, any> = {};
-
-    // If entity information is provided, include it in process variables
-    if (entityId && entityType) {
-      processVariables[`${entityType.toLowerCase()}Id`] = entityId;
-      processVariables.entityType = entityType;
-    }
-
     ProcessInstanceService.startProcess(processName, {
       initiatedBy,
-      processVariables
+      processVariables: {},
+      entities: entities
     })
     .then(() => {
       onClose();
@@ -51,14 +45,30 @@ const StartProcessDialog: React.FC<StartProcessDialogProps> = ({
     });
   };
 
+  // Determine which entities to display
+  const displayEntities = entities || [];
+
   return (
     <>
       <DialogTitle>Start New {processName} Process</DialogTitle>
       <DialogContent>
-        {entityId && entityType && (
-          <Typography variant="body2" color="text.secondary" sx={{ "{{" }}  mb: 2, p: 1, bgcolor: 'action.hover', borderRadius: 1  {{ "}}" }}>
-            This process will be linked to <strong>{entityType} #{entityId}</strong>
-          </Typography>
+        {displayEntities.length > 0 && (
+          <Box sx={{ "{{" }}  mb: 2, p: 1.5, bgcolor: 'action.hover', borderRadius: 1  {{ "}}" }}>
+            <Typography variant="body2" color="text.secondary" sx={{ "{{" }}  mb: 1  {{ "}}" }}>
+              This process will be linked to:
+            </Typography>
+            <Box sx={{ "{{" }}  display: 'flex', flexWrap: 'wrap', gap: 1  {{ "}}" }}>
+              {displayEntities.map((entity, index) => (
+                <Chip
+                  key={`${entity.entityType}-${entity.entityId}-${index}`}
+                  label={`${entity.entityType} #${entity.entityId}`}
+                  size="small"
+                  color="primary"
+                  variant="outlined"
+                />
+              ))}
+            </Box>
+          </Box>
         )}
 
         <TextField

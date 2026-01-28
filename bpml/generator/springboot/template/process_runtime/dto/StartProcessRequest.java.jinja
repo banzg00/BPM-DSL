@@ -5,6 +5,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.util.List;
 import java.util.Map;
 
 @Data
@@ -15,4 +16,16 @@ public class StartProcessRequest {
 
     private String initiatedBy;
     private Map<String, Object> processVariables;
+
+    // Support for multiple entities
+    private List<EntityReference> entities;
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class EntityReference {
+        private String entityType;
+        private Long entityId;
+    }
 }

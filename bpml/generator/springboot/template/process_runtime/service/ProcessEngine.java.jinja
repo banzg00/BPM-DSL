@@ -29,6 +29,10 @@ public class ProcessEngine {
     private final TransitionHistoryRepository transitionHistoryRepository;
     private final ObjectMapper objectMapper;
 
+    {% for entity in all_entities %}
+    private final {{ entity.name }}Repository {{ entity.name|lower }}Repository;
+    {% endfor %}
+
     /**
      * Start a new process instance
      */
@@ -44,18 +48,55 @@ public class ProcessEngine {
         Map<String, Object> definitionMap = parseDefinitionJson(definition.getDefinitionJson());
         String initialState = definition.getInitialState();
 
+        // Prepare process variables
+        Map<String, Object> processVariables = request.getProcessVariables() != null
+                ? new HashMap<>(request.getProcessVariables())
+                : new HashMap<>();
+
+        // Handle multiple entities if provided
+        if (request.getEntities() != null && !request.getEntities().isEmpty()) {
+            log.info("Processing {} entities for new process instance", request.getEntities().size());
+
+            // Store entity references in process variables
+            Map<String, List<Long>> entityIdsByType = new HashMap<>();
+            List<String> entityTypes = new ArrayList<>();
+
+            for (StartProcessRequest.EntityReference entityRef : request.getEntities()) {
+                String entityType = entityRef.getEntityType();
+                Long entityId = entityRef.getEntityId();
+                log.debug("Adding entity: type={}, id={}", entityType, entityId);
+
+                // Group entity IDs by type
+                entityIdsByType.computeIfAbsent(entityType, k -> new ArrayList<>()).add(entityId);
+
+                if (!entityTypes.contains(entityType)) {
+                    entityTypes.add(entityType);
+                }
+            }
+
+            // Store in process variables
+            processVariables.put("entityTypes", entityTypes);
+            processVariables.put("entityIdsByType", entityIdsByType);
+            log.info("Stored entityIdsByType in process variables: {}", entityIdsByType);
+        }
+
         // Create process instance
         ProcessInstance processInstance = ProcessInstance.builder()
                 .processName(processName)
                 .currentState(initialState)
                 .status(ProcessInstance.ProcessStatus.RUNNING)
                 .initiatedBy(request.getInitiatedBy())
-                .processVariables(serializeToJson(request.getProcessVariables()))
+                .processVariables(serializeToJson(processVariables))
                 .startedAt(LocalDateTime.now())
                 .build();
 
         ProcessInstance savedInstance = processInstanceRepository.save(processInstance);
         log.info("Created process instance {} in state {}", savedInstance.getId(), initialState);
+
+        // Update linked entities with processInstanceId
+        if (request.getEntities() != null && !request.getEntities().isEmpty()) {
+            linkEntitiesToProcess(savedInstance.getId(), request.getEntities());
+        }
 
         // Create initial tasks for the initial state
         createTasksForState(savedInstance, initialState, definitionMap);
@@ -315,14 +356,21 @@ public class ProcessEngine {
         steps.forEach(step -> {
             String stepName = (String) step.get("name");
             String role = (String) step.get("role");
-            String affectedEntity = (String) step.get("affectedEntity");
+
+            String affectedEntities = null;
+
+            @SuppressWarnings("unchecked")
+            List<String> entitiesList = (List<String>) step.get("entities");
+            if (entitiesList != null && !entitiesList.isEmpty()) {
+                affectedEntities = String.join(",", entitiesList);
+            }
 
             TaskInstance task = TaskInstance.builder()
                     .processInstanceId(processInstance.getId())
                     .taskName(stepName)
                     .assignedRole(role)
                     .status(TaskInstance.TaskStatus.PENDING)
-                    .entityType(affectedEntity)
+                    .entityTypes(affectedEntities)
                     .createdAt(LocalDateTime.now())
                     .build();
 
@@ -392,19 +440,72 @@ public class ProcessEngine {
     }
 
     private ProcessInstanceDTO mapToProcessInstanceDTO(ProcessInstance instance) {
+        // Extract linked entities from process variables
+        Map<String, Object> processVariables = parseDefinitionJson(instance.getProcessVariables());
+        List<ProcessInstanceDTO.EntityReference> linkedEntities = new ArrayList<>();
+
+        log.debug("Mapping process instance {} to DTO. Process variables keys: {}",
+                  instance.getId(), processVariables.keySet());
+
+        if (processVariables.containsKey("entityIdsByType")) {
+            log.debug("Found entityIdsByType in process variables");
+            try {
+                @SuppressWarnings("unchecked")
+                Map<String, Object> entityIdsByType = (Map<String, Object>) processVariables.get("entityIdsByType");
+                log.debug("entityIdsByType value: {}", entityIdsByType);
+
+                for (Map.Entry<String, Object> entry : entityIdsByType.entrySet()) {
+                    String entityType = entry.getKey();
+                    Object entityIdsObj = entry.getValue();
+                    log.debug("Processing entity type: {}, IDs object: {}", entityType, entityIdsObj);
+
+                    // Handle both List and array types
+                    List<?> entityIdsList;
+                    if (entityIdsObj instanceof List) {
+                        entityIdsList = (List<?>) entityIdsObj;
+                    } else {
+                        log.warn("Unexpected type for entity IDs: {}", entityIdsObj.getClass());
+                        continue;
+                    }
+
+                    // Convert each ID to Long, handling Integer, Long, or other numeric types
+                    for (Object entityIdObj : entityIdsList) {
+                        Long entityId = null;
+                        if (entityIdObj instanceof Number) {
+                            entityId = ((Number) entityIdObj).longValue();
+                        } else {
+                            log.warn("Unexpected entity ID type: {}", entityIdObj.getClass());
+                            continue;
+                        }
+
+                        linkedEntities.add(ProcessInstanceDTO.EntityReference.builder()
+                                .entityType(entityType)
+                                .entityId(entityId)
+                                .build());
+                    }
+                }
+                log.info("Extracted {} linked entities for process instance {}", linkedEntities.size(), instance.getId());
+            } catch (Exception e) {
+                log.error("Error extracting linked entities from process variables", e);
+            }
+        } else {
+            log.debug("No entityIdsByType found in process variables for instance {}", instance.getId());
+        }
+
         return ProcessInstanceDTO.builder()
                 .id(instance.getId())
                 .processName(instance.getProcessName())
                 .currentState(instance.getCurrentState())
                 .status(instance.getStatus())
                 .initiatedBy(instance.getInitiatedBy())
-                .processVariables(parseDefinitionJson(instance.getProcessVariables()))
+                .processVariables(processVariables)
                 .startedAt(instance.getStartedAt())
                 .completedAt(instance.getCompletedAt())
                 .terminatedReason(instance.getTerminatedReason())
                 .suspendedAt(instance.getSuspendedAt())
                 .suspendedReason(instance.getSuspendedReason())
                 .suspendedBy(instance.getSuspendedBy())
+                .linkedEntities(linkedEntities)
                 .build();
     }
 
@@ -420,5 +521,27 @@ public class ProcessEngine {
                 .transitionData(parseDefinitionJson(history.getTransitionData()))
                 .executedAt(history.getExecutedAt())
                 .build();
+    }
+
+    /**
+     * Link multiple entities to a process instance
+     */
+    private void linkEntitiesToProcess(Long processInstanceId, List<StartProcessRequest.EntityReference> entities) {
+        for (StartProcessRequest.EntityReference entityRef : entities) {
+            String entityType = entityRef.getEntityType();
+            Long entityId = entityRef.getEntityId();
+
+            try {
+                {% for entity in all_entities %}
+                if ("{{ entity.name }}".equals(entityType)) {
+                    {{ entity.name|lower }}Repository.updateProcessInstanceId(entityId, processInstanceId);
+                    log.debug("Linked {} entity {} to process instance {}", entityType, entityId, processInstanceId);
+                }
+                {% endfor %}
+            } catch (Exception e) {
+                log.error("Failed to link entity {} of type {} to process instance {}",
+                         entityId, entityType, processInstanceId, e);
+            }
+        }
     }
 }

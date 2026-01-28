@@ -1,0 +1,257 @@
+import React, { useState, useEffect } from 'react';
+import {
+  Button,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  TextField,
+  Typography,
+  Box,
+  Autocomplete,
+  IconButton,
+  List,
+  ListItem,
+  ListItemText,
+  ListItemSecondaryAction
+} from '@mui/material';
+import DeleteIcon from '@mui/icons-material/Delete';
+import AddIcon from '@mui/icons-material/Add';
+import ProcessInstanceService from '../../services/ProcessInstanceService';
+import { EntityReference } from '../../types/types';
+{% for entity in entities %}
+import {{ entity.name }}Service from '../../services/{{ entity.name }}Service';
+{% endfor %}
+
+interface StartMultiEntityProcessDialogProps {
+  processName: string;
+  onClose: () => void;
+  initialEntities?: EntityReference[];
+  allowedEntityTypes?: string[];
+}
+
+const StartMultiEntityProcessDialog: React.FC<StartMultiEntityProcessDialogProps> = ({
+  processName,
+  onClose,
+  initialEntities = [],
+  allowedEntityTypes
+}) => {
+  const [initiatedBy, setInitiatedBy] = useState('');
+  const [error, setError] = useState('');
+  const [selectedEntities, setSelectedEntities] = useState<EntityReference[]>(initialEntities);
+  const [selectedEntityType, setSelectedEntityType] = useState<string>('');
+  const [availableEntities, setAvailableEntities] = useState<Array<{ id: number; label: string; type: string }>>([]);
+  const [selectedEntity, setSelectedEntity] = useState<{ id: number; label: string; type: string } | null>(null);
+
+  // Entity types available - use allowed types if provided, otherwise all entity types
+  const entityTypes = allowedEntityTypes || [
+    {% for entity in entities %}'{{ entity.name }}',
+    {% endfor %}
+  ];
+
+  // Load available entities when entity type is selected
+  useEffect(() => {
+    if (!selectedEntityType) {
+      setAvailableEntities([]);
+      return;
+    }
+
+    // Fetch entities based on selected type
+    const loadEntities = async () => {
+      try {
+        let entities: any[] = [];
+        {% for entity in entities %}
+        if (selectedEntityType === '{{ entity.name }}') {
+          entities = await {{ entity.name }}Service.getAll{{ entity.name }}();
+        }
+        {% endfor %}
+
+        const formattedEntities = entities.map((entity) => ({
+          id: entity.id!,
+          label: `#${entity.id}${getEntityLabel(entity)}`,
+          type: selectedEntityType
+        }));
+
+        setAvailableEntities(formattedEntities);
+      } catch (err) {
+        console.error('Failed to load entities', err);
+      }
+    };
+
+    loadEntities();
+  }, [selectedEntityType]);
+
+  // Helper to get a meaningful label for an entity
+  const getEntityLabel = (entity: any): string => {
+    // Try to find a meaningful field to display
+    const labelFields = ['name', 'title', 'description', 'invoiceNumber', 'firstName', 'lastName'];
+
+    for (const field of labelFields) {
+      if (entity[field]) {
+        return ` - ${entity[field]}`;
+      }
+    }
+
+    return '';
+  };
+
+  const handleAddEntity = () => {
+    if (selectedEntity) {
+      // Check if entity is already added
+      const exists = selectedEntities.some(
+        (e) => e.entityType === selectedEntity.type && e.entityId === selectedEntity.id
+      );
+
+      if (!exists) {
+        setSelectedEntities([
+          ...selectedEntities,
+          { entityType: selectedEntity.type, entityId: selectedEntity.id }
+        ]);
+      }
+
+      setSelectedEntity(null);
+      setSelectedEntityType('');
+    }
+  };
+
+  const handleRemoveEntity = (index: number) => {
+    setSelectedEntities(selectedEntities.filter((_, i) => i !== index));
+  };
+
+  const handleStart = () => {
+    if (!initiatedBy.trim()) {
+      setError('User ID is required');
+      return;
+    }
+
+    if (selectedEntities.length === 0) {
+      setError('At least one entity must be selected');
+      return;
+    }
+
+    ProcessInstanceService.startProcess(processName, {
+      initiatedBy,
+      processVariables: {},
+      entities: selectedEntities
+    })
+    .then(() => {
+      onClose();
+    })
+    .catch((err) => {
+      setError(err.message || 'Failed to start process');
+    });
+  };
+
+  return (
+    <>
+      <DialogTitle>Start New {processName} Process with Multiple Entities</DialogTitle>
+      <DialogContent>
+        {/* Selected Entities Display */}
+        {selectedEntities.length > 0 && (
+          <Box sx={{ "{{" }}  mb: 2, p: 1.5, bgcolor: 'action.hover', borderRadius: 1  {{ "}}" }}>
+            <Typography variant="body2" color="text.secondary" sx={{ "{{" }}  mb: 1  {{ "}}" }}>
+              Selected Entities ({selectedEntities.length}):
+            </Typography>
+            <List dense>
+              {selectedEntities.map((entity, index) => (
+                <ListItem key={`${entity.entityType}-${entity.entityId}-${index}`}>
+                  <ListItemText
+                    primary={`${entity.entityType} #${entity.entityId}`}
+                  />
+                  <ListItemSecondaryAction>
+                    <IconButton edge="end" onClick={() => handleRemoveEntity(index)} size="small">
+                      <DeleteIcon />
+                    </IconButton>
+                  </ListItemSecondaryAction>
+                </ListItem>
+              ))}
+            </List>
+          </Box>
+        )}
+
+        {/* Add Entity Section */}
+        <Box sx={{ "{{" }}  mb: 2  {{ "}}" }}>
+          <Typography variant="subtitle2" sx={{ "{{" }}  mb: 1  {{ "}}" }}>
+            Add Entity to Process
+          </Typography>
+
+          <Box sx={{ "{{" }}  display: 'flex', gap: 1, mb: 1  {{ "}}" }}>
+            <Autocomplete
+              options={entityTypes}
+              value={selectedEntityType || null}
+              onChange={(_, newValue) => {
+                setSelectedEntityType(newValue || '');
+                setSelectedEntity(null);
+              }}
+              renderInput={(params) => (
+                <TextField
+                  {...params}
+                  label="Entity Type"
+                  size="small"
+                />
+              )}
+              sx={{ "{{" }}  flex: 1  {{ "}}" }}
+            />
+
+            <Autocomplete
+              options={availableEntities}
+              value={selectedEntity}
+              onChange={(_, newValue) => setSelectedEntity(newValue)}
+              getOptionLabel={(option) => option.label}
+              isOptionEqualToValue={(option, value) => option.id === value.id && option.type === value.type}
+              renderInput={(params) => (
+                <TextField
+                  {...params}
+                  label="Select Entity"
+                  size="small"
+                />
+              )}
+              disabled={!selectedEntityType}
+              sx={{ "{{" }}  flex: 1  {{ "}}" }}
+            />
+
+            <Button
+              variant="outlined"
+              onClick={handleAddEntity}
+              disabled={!selectedEntity}
+              startIcon={<AddIcon />}
+            >
+              Add
+            </Button>
+          </Box>
+        </Box>
+
+        {/* User ID Field */}
+        <TextField
+          label="Initiated By (User ID)"
+          placeholder="Enter your user ID (e.g., admin, user1)"
+          value={initiatedBy}
+          onChange={(e) => setInitiatedBy(e.target.value)}
+          fullWidth
+          required
+          margin="normal"
+          error={!!error && !initiatedBy}
+          helperText={!!error && !initiatedBy ? 'User ID is required' : 'Enter the ID of the user starting this process'}
+        />
+
+        {error && (
+          <Typography color="error" variant="body2" sx={{ "{{" }}  mt: 1  {{ "}}" }}>
+            {error}
+          </Typography>
+        )}
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={onClose}>Cancel</Button>
+        <Button
+          variant="contained"
+          color="primary"
+          onClick={handleStart}
+          disabled={selectedEntities.length === 0}
+        >
+          Start Process
+        </Button>
+      </DialogActions>
+    </>
+  );
+};
+
+export default StartMultiEntityProcessDialog;

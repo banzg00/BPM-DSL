@@ -8,6 +8,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Map;
 
 @Data
@@ -36,4 +37,16 @@ public class ProcessInstanceDTO {
 
     private String suspendedReason;
     private String suspendedBy;
+
+    // Linked entities
+    private List<EntityReference> linkedEntities;
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class EntityReference {
+        private String entityType;
+        private Long entityId;
+    }
 }

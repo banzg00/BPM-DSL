@@ -1,6 +1,7 @@
 import React from 'react';
 import { BrowserRouter as Router, Route, Routes, Navigate } from 'react-router-dom';
 import HomePage from './components/HomePage';
+import StartProcessPage from './components/StartProcessPage';
 
 {% for entity in entities %}
 import {{ entity.name }}Page from './pages/{{ entity.name }}/{{ entity.name }}Page';
@@ -19,6 +20,7 @@ const AppRoutes: React.FC = () => {
     <Router>
       <Routes>
         <Route path="/" element={<HomePage />} />
+        <Route path="/start-process" element={<StartProcessPage />} />
 
         {/* Entity routes */}
         {% for entity in entities %}

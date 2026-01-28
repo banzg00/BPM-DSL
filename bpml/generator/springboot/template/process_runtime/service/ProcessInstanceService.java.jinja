@@ -15,6 +15,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -110,20 +111,69 @@ public class ProcessInstanceService {
     }
 
     private ProcessInstanceDTO mapToDTO(ProcessInstance instance) {
+        Map<String, Object> processVariables = parseJson(instance.getProcessVariables());
+        List<ProcessInstanceDTO.EntityReference> linkedEntities = extractLinkedEntities(processVariables);
+
         return ProcessInstanceDTO.builder()
                 .id(instance.getId())
                 .processName(instance.getProcessName())
                 .currentState(instance.getCurrentState())
                 .status(instance.getStatus())
                 .initiatedBy(instance.getInitiatedBy())
-                .processVariables(parseJson(instance.getProcessVariables()))
+                .processVariables(processVariables)
                 .startedAt(instance.getStartedAt())
                 .completedAt(instance.getCompletedAt())
                 .terminatedReason(instance.getTerminatedReason())
                 .suspendedAt(instance.getSuspendedAt())
                 .suspendedReason(instance.getSuspendedReason())
                 .suspendedBy(instance.getSuspendedBy())
+                .linkedEntities(linkedEntities)
                 .build();
+    }
+
+    private List<ProcessInstanceDTO.EntityReference> extractLinkedEntities(Map<String, Object> processVariables) {
+        List<ProcessInstanceDTO.EntityReference> linkedEntities = new ArrayList<>();
+
+        if (processVariables.containsKey("entityIdsByType")) {
+            try {
+                @SuppressWarnings("unchecked")
+                Map<String, Object> entityIdsByType = (Map<String, Object>) processVariables.get("entityIdsByType");
+
+                for (Map.Entry<String, Object> entry : entityIdsByType.entrySet()) {
+                    String entityType = entry.getKey();
+                    Object entityIdsObj = entry.getValue();
+
+                    // Handle both List and array types
+                    List<?> entityIdsList;
+                    if (entityIdsObj instanceof List) {
+                        entityIdsList = (List<?>) entityIdsObj;
+                    } else {
+                        log.warn("Unexpected type for entity IDs: {}", entityIdsObj.getClass());
+                        continue;
+                    }
+
+                    // Convert each ID to Long, handling Integer, Long, or other numeric types
+                    for (Object entityIdObj : entityIdsList) {
+                        Long entityId = null;
+                        if (entityIdObj instanceof Number) {
+                            entityId = ((Number) entityIdObj).longValue();
+                        } else {
+                            log.warn("Unexpected entity ID type: {}", entityIdObj.getClass());
+                            continue;
+                        }
+
+                        linkedEntities.add(ProcessInstanceDTO.EntityReference.builder()
+                                .entityType(entityType)
+                                .entityId(entityId)
+                                .build());
+                    }
+                }
+            } catch (Exception e) {
+                log.error("Error extracting linked entities from process variables", e);
+            }
+        }
+
+        return linkedEntities;
     }
 
     private Map<String, Object> parseJson(String json) {

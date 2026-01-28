@@ -12,6 +12,21 @@ const HomePage: React.FC = () => {
         Business Process Management System
       </Typography>
 
+      {/* Quick Actions */}
+      <Grid container spacing={2} sx={{ "{{" }}  mt: 2, mb: 4  {{ "}}" }}>
+        <Grid item>
+          <Button
+            component={Link}
+            to="/start-process"
+            variant="contained"
+            color="primary"
+            size="large"
+          >
+            Start New Process
+          </Button>
+        </Grid>
+      </Grid>
+
       <Grid container spacing={3} sx={{ "{{" }}  mt: 2  {{ "}}" }}>
         {/* Processes Section */}
         <Grid item xs={12}>

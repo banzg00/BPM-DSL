@@ -29,6 +29,11 @@ export enum TaskStatus {
   CANCELLED = 'CANCELLED'
 }
 
+export interface EntityReference {
+  entityType: string;
+  entityId: number;
+}
+
 export interface ProcessInstance {
   id: number;
   processName: string;
@@ -42,6 +47,7 @@ export interface ProcessInstance {
   suspendedAt?: string;
   suspendedReason?: string;
   suspendedBy?: string;
+  linkedEntities?: EntityReference[];
 }
 
 export interface TaskInstance {
@@ -52,7 +58,7 @@ export interface TaskInstance {
   assignedUser?: string;
   status: TaskStatus;
   entityId?: number;
-  entityType?: string;
+  entityTypes?: string[]; // List of entity types this task affects
   taskData: Record<string, any>;
   createdAt: string;
   claimedAt?: string;
@@ -82,6 +88,7 @@ export interface TransitionHistory {
 export interface StartProcessRequest {
   initiatedBy: string;
   processVariables?: Record<string, any>;
+  entities?: EntityReference[];
 }
 
 export interface ExecuteTransitionRequest {

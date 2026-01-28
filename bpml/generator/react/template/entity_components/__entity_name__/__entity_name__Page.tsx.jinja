@@ -168,8 +168,7 @@ const {{ entity_name }}Page: React.FC = () => {
       <Dialog open={isStartProcessDialogOpen} onClose={handleStartProcessDialogClose} maxWidth="sm" fullWidth>
         <StartProcessDialog
           processName={selectedProcess}
-          entityId={parseInt(id!)}
-          entityType="{{ entity_name }}"
+          entities={[{ entityType: "{{ entity_name }}", entityId: parseInt(id!) }]}
           onClose={handleStartProcessDialogClose}
         />
       </Dialog>

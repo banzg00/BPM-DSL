@@ -2,6 +2,9 @@ package {{ group_name }}.{{ app_name_lower }}.repository;
 
 import {{ group_name }}.{{ app_name_lower }}.model.{{ entity_name_cap }};
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -13,4 +16,11 @@ public interface {{ entity_name_cap }}Repository extends JpaRepository<{{ entity
      * Find all entities associated with a specific process instance
      */
     List<{{ entity_name_cap }}> findByProcessInstanceId(Long processInstanceId);
+
+    /**
+     * Update process instance ID for a specific entity
+     */
+    @Modifying
+    @Query("UPDATE {{ entity_name_cap }} e SET e.processInstanceId = :processInstanceId WHERE e.id = :entityId")
+    void updateProcessInstanceId(@Param("entityId") Long entityId, @Param("processInstanceId") Long processInstanceId);
 }
