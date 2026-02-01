@@ -368,15 +368,28 @@ public class ProcessEngine {
                         affectedEntities = String.join(",", entitiesList);
                     }
 
+                    // Get task dependencies
+                    String taskDependencies = null;
+                    @SuppressWarnings("unchecked")
+                    List<String> dependenciesList = (List<String>) task.get("dependencies");
+                    if (dependenciesList != null && !dependenciesList.isEmpty()) {
+                        taskDependencies = String.join(",", dependenciesList);
+                    }
+
                     // Determine task status and completion time
                     boolean isAutomated = (isAuto != null && isAuto);
-                    TaskInstance.TaskStatus status = isAutomated
+
+                    // Automated tasks with dependencies should wait for dependencies to complete
+                    boolean hasDependencies = (taskDependencies != null && !taskDependencies.isEmpty());
+                    boolean canAutoComplete = isAutomated && (!hasDependencies || allDependenciesCompleted(processInstance.getId(), taskDependencies));
+
+                    TaskInstance.TaskStatus status = canAutoComplete
                             ? TaskInstance.TaskStatus.COMPLETED
                             : TaskInstance.TaskStatus.PENDING;
 
-                    LocalDateTime completedAt = isAutomated ? LocalDateTime.now() : null;
+                    LocalDateTime completedAt = canAutoComplete ? LocalDateTime.now() : null;
                     String assignedRole = isAutomated ? "SYSTEM" : role;
-                    String completedBy = isAutomated ? "SYSTEM" : null;
+                    String completedBy = canAutoComplete ? "SYSTEM" : null;
 
                     TaskInstance taskInstance = TaskInstance.builder()
                             .processInstanceId(processInstance.getId())
@@ -384,6 +397,7 @@ public class ProcessEngine {
                             .assignedRole(assignedRole)
                             .status(status)
                             .entityTypes(affectedEntities)
+                            .dependencies(taskDependencies)
                             .createdAt(LocalDateTime.now())
                             .completedAt(completedAt)
                             .completedBy(completedBy)
@@ -394,6 +408,9 @@ public class ProcessEngine {
                             (isAuto != null && isAuto) ? "automated" : "manual",
                             taskName, processInstance.getId(), state);
                 });
+
+        // After creating tasks, check if any SYSTEM tasks can now be auto-completed
+        autoCompleteSystemTasksWithSatisfiedDependencies(processInstance.getId());
     }
 
     private void completeTasksForState(Long processInstanceId, String state, String userId) {
@@ -407,6 +424,9 @@ public class ProcessEngine {
                     task.setCompletedBy(userId);
                 });
         taskInstanceRepository.saveAll(tasks);
+
+        // After completing tasks, check if any SYSTEM tasks can now be auto-completed
+        autoCompleteSystemTasksWithSatisfiedDependencies(processInstanceId);
     }
 
     private Map<String, Object> findTransition(Map<String, Object> definitionMap, String transitionName) {
@@ -430,6 +450,72 @@ public class ProcessEngine {
     @SuppressWarnings("unchecked")
     private List<String> getFinalStates(Map<String, Object> definitionMap) {
         return (List<String>) definitionMap.getOrDefault("finalStates", Collections.emptyList());
+    }
+
+    /**
+     * Check if all dependencies for a task are completed
+     */
+    private boolean allDependenciesCompleted(Long processInstanceId, String dependencies) {
+        if (dependencies == null || dependencies.isEmpty()) {
+            return true;
+        }
+
+        String[] dependencyNames = dependencies.split(",");
+        List<TaskInstance> allTasksInProcess = taskInstanceRepository.findByProcessInstanceId(processInstanceId);
+
+        for (String depName : dependencyNames) {
+            boolean depCompleted = allTasksInProcess.stream()
+                .anyMatch(t -> t.getTaskName().equals(depName.trim()) &&
+                               t.getStatus() == TaskInstance.TaskStatus.COMPLETED);
+
+            if (!depCompleted) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * Auto-complete SYSTEM tasks whose dependencies are now satisfied
+     */
+    private void autoCompleteSystemTasksWithSatisfiedDependencies(Long processInstanceId) {
+        List<TaskInstance> allTasks = taskInstanceRepository.findByProcessInstanceId(processInstanceId);
+
+        // Find all SYSTEM tasks that are still PENDING
+        List<TaskInstance> pendingSystemTasks = allTasks.stream()
+            .filter(t -> "SYSTEM".equals(t.getAssignedRole()) &&
+                         t.getStatus() == TaskInstance.TaskStatus.PENDING)
+            .toList();
+
+        for (TaskInstance systemTask : pendingSystemTasks) {
+            // Check if this task has dependencies
+            if (systemTask.getDependencies() != null && !systemTask.getDependencies().isEmpty()) {
+                String[] dependencyNames = systemTask.getDependencies().split(",");
+                boolean allDependenciesMet = true;
+
+                // Check if all dependencies are completed
+                for (String depName : dependencyNames) {
+                    boolean depCompleted = allTasks.stream()
+                        .anyMatch(t -> t.getTaskName().equals(depName.trim()) &&
+                                       t.getStatus() == TaskInstance.TaskStatus.COMPLETED);
+
+                    if (!depCompleted) {
+                        allDependenciesMet = false;
+                        break;
+                    }
+                }
+
+                // If all dependencies are met, complete this SYSTEM task
+                if (allDependenciesMet) {
+                    systemTask.setStatus(TaskInstance.TaskStatus.COMPLETED);
+                    systemTask.setCompletedAt(LocalDateTime.now());
+                    systemTask.setCompletedBy("SYSTEM");
+                    taskInstanceRepository.save(systemTask);
+                    log.info("Auto-completed SYSTEM task {} after dependencies were satisfied", systemTask.getId());
+                }
+            }
+        }
     }
 
     private Map<String, Object> parseDefinitionJson(String json) {

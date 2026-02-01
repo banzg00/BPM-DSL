@@ -52,18 +52,19 @@ process InvoiceApproval {
     state CompletedState
 
     // Define workflow tasks (tasks belong to specific states)
+    task InitTask in DraftState by Employee
     task CreateInvoice in DraftState by Employee affects Invoice
-    task SubmitInvoice in DraftState auto affects Invoice
+    task SubmitInvoice in DraftState auto affects Invoice depends_on InitTask, CreateInvoice
     task ReviewByManager in SubmittedForApprovalState by Manager affects Invoice, ApprovalRecord
     task ReviewByFinance in FinanceReviewState by FinanceTeam affects Invoice, ApprovalRecord
     task ApprovalByCFO in CFOApprovalState by CFO affects Invoice, ApprovalRecord
     task ProcessPayment in PaymentProcessingState by CFO affects PaymentInfo
-    task RecordApproval in ManagerReviewState by Manager affects ApprovalRecord
-    task RecordFinanceApproval in FinanceReviewState by FinanceTeam affects ApprovalRecord
-    task RecordCFOApproval in CFOApprovalState by CFO affects ApprovalRecord
+    task RecordApproval in ManagerReviewState by Manager affects ApprovalRecord depends_on ReviewByManager
+    task RecordFinanceApproval in FinanceReviewState by FinanceTeam affects ApprovalRecord depends_on ReviewByFinance
+    task RecordCFOApproval in CFOApprovalState by CFO affects ApprovalRecord depends_on ApprovalByCFO
     task RejectInvoice in RejectedState by Manager affects Invoice
-    task CloseInvoice in CompletedState by CFO affects Invoice, PaymentInfo
-    task NotifyStakeholders in CompletedState auto
+    task CloseInvoice in CompletedState by CFO affects Invoice, PaymentInfo depends_on ProcessPayment
+    task NotifyStakeholders in CompletedState auto depends_on CloseInvoice
 
     // Define state transitions
     transition InitiateDraftTransition
@@ -166,15 +167,15 @@ process EmployeeOnboarding {
     state InTrainingState
     state ActiveState
 
-    // Tasks
+    // Tasks with dependencies
     task SubmitDocuments in NewState by NewEmployee affects Employee
-    task VerifyDocuments in DocumentsSubmittedState by HR affects Employee
-    task RunBackgroundCheck in BackgroundCheckState by HR affects Employee
+    task VerifyDocuments in DocumentsSubmittedState by HR affects Employee depends_on SubmitDocuments
+    task RunBackgroundCheck in BackgroundCheckState by HR affects Employee depends_on VerifyDocuments
     task SetupWorkstation in EquipmentSetupState by ITSupport affects Equipment
-    task AssignEquipment in EquipmentSetupState by ITSupport affects Equipment
-    task ScheduleOrientation in TrainingScheduledState by HR affects TrainingRecord
-    task ConductTraining in InTrainingState by Trainer affects TrainingRecord
-    task ActivateEmployee in ActiveState by Supervisor affects Employee
+    task AssignEquipment in EquipmentSetupState by ITSupport affects Equipment depends_on SetupWorkstation
+    task ScheduleOrientation in TrainingScheduledState by HR affects TrainingRecord depends_on AssignEquipment
+    task ConductTraining in InTrainingState by Trainer affects TrainingRecord depends_on ScheduleOrientation
+    task ActivateEmployee in ActiveState by Supervisor affects Employee depends_on ConductTraining
 
     // Transitions
     transition SubmitEmployeeInfoTransition

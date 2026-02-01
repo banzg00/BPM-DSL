@@ -114,9 +114,53 @@ def _validate_process_structure(process):
                         f"Task '{task.name}' references unknown entity '{entity.name}' in process '{process.name}'"
                     )
 
+        # Validate dependencies (optional)
+        if hasattr(task, 'dependencies') and task.dependencies:
+            for dep_task in task.dependencies:
+                if dep_task.name not in task_names:
+                    raise TextXSemanticError(
+                        f"Task '{task.name}' depends on unknown task '{dep_task.name}' in process '{process.name}'"
+                    )
+
+    # Validate task dependencies for cycles
+    _validate_task_dependencies(tasks, process.name)
+
     # Validate flow
     if hasattr(process, "flow") and process.flow:
         _validate_flow(process.flow, task_names, process.name)
+
+
+def _validate_task_dependencies(tasks, process_name):
+    """Validate task dependencies for circular references"""
+    def has_cycle(task, visited, rec_stack, task_map):
+        """DFS to detect cycles in task dependencies"""
+        visited.add(task.name)
+        rec_stack.add(task.name)
+
+        if hasattr(task, 'dependencies') and task.dependencies:
+            for dep_task in task.dependencies:
+                dep_name = dep_task.name
+                if dep_name not in visited:
+                    if has_cycle(task_map[dep_name], visited, rec_stack, task_map):
+                        return True
+                elif dep_name in rec_stack:
+                    return True
+
+        rec_stack.remove(task.name)
+        return False
+
+    # Build task name to task object map
+    task_map = {task.name: task for task in tasks}
+
+    # Check for cycles starting from each task
+    visited = set()
+    for task in tasks:
+        if task.name not in visited:
+            rec_stack = set()
+            if has_cycle(task, visited, rec_stack, task_map):
+                raise TextXSemanticError(
+                    f"Circular dependency detected in task dependencies in process '{process_name}'"
+                )
 
 
 def _validate_flow(flow, valid_task_names, process_name):

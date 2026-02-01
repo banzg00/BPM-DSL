@@ -147,6 +147,13 @@ public class ProcessDefinitionLoader implements CommandLineRunner {
             {% endfor %}
             task{{ task_counter.value }}.put("entities", entities{{ task_counter.value }});
             {% endif %}
+            {% if elem.dependencies %}
+            List<String> dependencies{{ task_counter.value }} = new ArrayList<>();
+            {% for dep_task in elem.dependencies %}
+            dependencies{{ task_counter.value }}.add("{{ dep_task.name }}");
+            {% endfor %}
+            task{{ task_counter.value }}.put("dependencies", dependencies{{ task_counter.value }});
+            {% endif %}
             tasks.add(task{{ task_counter.value }});
             {% endif %}
             {% endfor %}

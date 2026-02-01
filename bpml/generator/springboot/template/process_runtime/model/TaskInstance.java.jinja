@@ -48,6 +48,9 @@ public class TaskInstance {
     @Column(name = "task_data", columnDefinition = "TEXT")
     private String taskData; // JSON for additional task-specific data
 
+    @Column(name = "dependencies", columnDefinition = "TEXT")
+    private String dependencies; // Comma-separated list of task names this task depends on
+
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 

@@ -60,6 +60,7 @@ Task:
     'in' state=[State]
     (('by' role=[Role]) | auto?='auto')
     ('affects' entities+=[Entity][','])?
+    ('depends_on' dependencies+=[Task][','])?
 ;
 
 Flow:

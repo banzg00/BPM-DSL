@@ -143,6 +143,11 @@ public class TaskService {
             throw new IllegalStateException("Cannot claim task. Current status: " + task.getStatus());
         }
 
+        // Prevent claiming SYSTEM tasks (automated tasks)
+        if ("SYSTEM".equals(task.getAssignedRole())) {
+            throw new IllegalStateException("Cannot claim automated SYSTEM tasks");
+        }
+
         task.setAssignedUser(userId);
         task.setStatus(TaskInstance.TaskStatus.IN_PROGRESS);
         task.setClaimedAt(LocalDateTime.now());
@@ -169,6 +174,26 @@ public class TaskService {
             throw new IllegalStateException("Cannot complete cancelled task");
         }
 
+        // Check if all dependencies are completed
+        if (task.getDependencies() != null && !task.getDependencies().isEmpty()) {
+            String[] dependencyNames = task.getDependencies().split(",");
+            List<TaskInstance> allTasksInProcess = repository.findByProcessInstanceId(task.getProcessInstanceId());
+
+            for (String depName : dependencyNames) {
+                boolean depCompleted = allTasksInProcess.stream()
+                    .anyMatch(t -> t.getTaskName().equals(depName.trim()) &&
+                                   t.getStatus() == TaskInstance.TaskStatus.COMPLETED);
+
+                if (!depCompleted) {
+                    throw new IllegalStateException(
+                        "Cannot complete task '" + task.getTaskName() +
+                        "': dependency '" + depName.trim() + "' is not yet completed"
+                    );
+                }
+            }
+            log.info("All dependencies satisfied for task {}", taskId);
+        }
+
         task.setStatus(TaskInstance.TaskStatus.COMPLETED);
         task.setCompletedAt(LocalDateTime.now());
         task.setCompletedBy(userId);
@@ -179,7 +204,53 @@ public class TaskService {
 
         TaskInstance savedTask = repository.save(task);
         log.info("Task {} completed by user {}", taskId, userId);
+
+        // Check and auto-complete any SYSTEM tasks that were waiting for this task
+        autoCompleteSystemTasksWithSatisfiedDependencies(task.getProcessInstanceId());
+
         return mapToDTO(savedTask);
+    }
+
+    /**
+     * Auto-complete SYSTEM tasks whose dependencies are now satisfied
+     */
+    private void autoCompleteSystemTasksWithSatisfiedDependencies(Long processInstanceId) {
+        List<TaskInstance> allTasks = repository.findByProcessInstanceId(processInstanceId);
+
+        // Find all SYSTEM tasks that are still PENDING
+        List<TaskInstance> pendingSystemTasks = allTasks.stream()
+            .filter(t -> "SYSTEM".equals(t.getAssignedRole()) &&
+                         t.getStatus() == TaskInstance.TaskStatus.PENDING)
+            .toList();
+
+        for (TaskInstance systemTask : pendingSystemTasks) {
+            // Check if this task has dependencies
+            if (systemTask.getDependencies() != null && !systemTask.getDependencies().isEmpty()) {
+                String[] dependencyNames = systemTask.getDependencies().split(",");
+                boolean allDependenciesMet = true;
+
+                // Check if all dependencies are completed
+                for (String depName : dependencyNames) {
+                    boolean depCompleted = allTasks.stream()
+                        .anyMatch(t -> t.getTaskName().equals(depName.trim()) &&
+                                       t.getStatus() == TaskInstance.TaskStatus.COMPLETED);
+
+                    if (!depCompleted) {
+                        allDependenciesMet = false;
+                        break;
+                    }
+                }
+
+                // If all dependencies are met, complete this SYSTEM task
+                if (allDependenciesMet) {
+                    systemTask.setStatus(TaskInstance.TaskStatus.COMPLETED);
+                    systemTask.setCompletedAt(LocalDateTime.now());
+                    systemTask.setCompletedBy("SYSTEM");
+                    repository.save(systemTask);
+                    log.info("Auto-completed SYSTEM task {} after dependencies were satisfied", systemTask.getId());
+                }
+            }
+        }
     }
 
     /**
@@ -269,6 +340,12 @@ public class TaskService {
             entityTypesList = List.of(task.getEntityTypes().split(","));
         }
 
+        // Parse dependencies from comma-separated string to list
+        List<String> dependenciesList = null;
+        if (task.getDependencies() != null && !task.getDependencies().isEmpty()) {
+            dependenciesList = List.of(task.getDependencies().split(","));
+        }
+
         return TaskInstanceDTO.builder()
                 .id(task.getId())
                 .processInstanceId(task.getProcessInstanceId())
@@ -279,6 +356,7 @@ public class TaskService {
                 .entityId(task.getEntityId())
                 .entityTypes(entityTypesList)
                 .taskData(parseJson(task.getTaskData()))
+                .dependencies(dependenciesList)
                 .createdAt(task.getCreatedAt())
                 .claimedAt(task.getClaimedAt())
                 .completedAt(task.getCompletedAt())

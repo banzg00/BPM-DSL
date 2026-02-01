@@ -223,7 +223,7 @@ const TaskList: React.FC = () => {
                 </TableCell>
                 <TableCell>{new Date(task.createdAt).toLocaleString()}</TableCell>
                 <TableCell>
-                  {task.status === TaskStatus.PENDING && (
+                  {task.status === TaskStatus.PENDING && task.assignedRole !== 'SYSTEM' && (
                     <Button
                       size="small"
                       variant="outlined"
