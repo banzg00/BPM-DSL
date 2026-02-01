@@ -43,7 +43,8 @@ def _validate_process_structure(process):
     """Validate the structure of a single process"""
     entities = process.entities if hasattr(process, "entities") else []
     roles = process.roles if hasattr(process, "roles") else []
-    steps = process.steps if hasattr(process, "steps") else []
+    states = process.states if hasattr(process, "states") else []
+    tasks = process.tasks if hasattr(process, "tasks") else []
 
     # Validate entities
     entity_names = set()
@@ -66,40 +67,64 @@ def _validate_process_structure(process):
     # Validate role hierarchy
     _validate_role_hierarchy(roles, process.name)
 
-    # Validate steps
-    step_names = set()
-    for step in steps:
-        if step.name in step_names:
+    # Validate states
+    state_names = set()
+    for state in states:
+        if state.name in state_names:
             raise TextXSemanticError(
-                f"Duplicate step name '{step.name}' in process '{process.name}'"
+                f"Duplicate state name '{state.name}' in process '{process.name}'"
             )
-        step_names.add(step.name)
+        state_names.add(state.name)
 
-        # Validate step references
-        if step.role and step.role.name not in role_names:
+    # Validate tasks
+    task_names = set()
+    for task in tasks:
+        if task.name in task_names:
             raise TextXSemanticError(
-                f"Step '{step.name}' references unknown role '{step.role.name}' in process '{process.name}'"
+                f"Duplicate task name '{task.name}' in process '{process.name}'"
+            )
+        task_names.add(task.name)
+
+        # Validate state reference
+        if task.state and task.state.name not in state_names:
+            raise TextXSemanticError(
+                f"Task '{task.name}' references unknown state '{task.state.name}' in process '{process.name}'"
+            )
+
+        # Validate that task has either a role or is automated (not both, not neither)
+        is_auto = hasattr(task, 'auto') and task.auto
+        has_role = hasattr(task, 'role') and task.role
+
+        if not is_auto and not has_role:
+            raise TextXSemanticError(
+                f"Task '{task.name}' must be either automated (use 'auto') or assigned to a role (use 'by RoleName') in process '{process.name}'"
+            )
+
+        # Validate role references
+        if has_role and task.role.name not in role_names:
+            raise TextXSemanticError(
+                f"Task '{task.name}' references unknown role '{task.role.name}' in process '{process.name}'"
             )
 
         # Validate entities (now optional and plural)
-        if hasattr(step, 'entities') and step.entities:
-            for entity in step.entities:
+        if hasattr(task, 'entities') and task.entities:
+            for entity in task.entities:
                 if entity.name not in entity_names:
                     raise TextXSemanticError(
-                        f"Step '{step.name}' references unknown entity '{entity.name}' in process '{process.name}'"
+                        f"Task '{task.name}' references unknown entity '{entity.name}' in process '{process.name}'"
                     )
 
     # Validate flow
     if hasattr(process, "flow") and process.flow:
-        _validate_flow(process.flow, step_names, process.name)
+        _validate_flow(process.flow, task_names, process.name)
 
 
-def _validate_flow(flow, valid_step_names, process_name):
+def _validate_flow(flow, valid_task_names, process_name):
     """Validate flow definition"""
-    for step_ref in flow.steps:
-        if step_ref.name not in valid_step_names:
+    for task_ref in flow.tasks:
+        if task_ref.name not in valid_task_names:
             raise TextXSemanticError(
-                f"Flow references unknown step '{step_ref.name}' in process '{process_name}'"
+                f"Flow references unknown task '{task_ref.name}' in process '{process_name}'"
             )
 
 

@@ -19,7 +19,7 @@ Process:
 ;
 
 Element:
-    Entity | Role | State | Transition | Step | Flow
+    Entity | Role | State | Transition | Task | Flow
 ;
 
 Entity:
@@ -55,14 +55,15 @@ Transition:
     'by' role=[Role]
 ;
 
-Step:
-    'step' name=ID
-    'by' role=[Role]
+Task:
+    'task' name=ID
+    'in' state=[State]
+    (('by' role=[Role]) | auto?='auto')
     ('affects' entities+=[Entity][','])?
 ;
 
 Flow:
-    'flow' steps+=[Step][',']
+    'flow' tasks+=[Task][',']
 ;
 
 Comment:

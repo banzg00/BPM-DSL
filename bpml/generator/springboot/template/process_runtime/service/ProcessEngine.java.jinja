@@ -350,33 +350,50 @@ public class ProcessEngine {
     // ===== PRIVATE HELPER METHODS =====
 
     private void createTasksForState(ProcessInstance processInstance, String state, Map<String, Object> definitionMap) {
-        List<Map<String, Object>> steps = getSteps(definitionMap);
+        List<Map<String, Object>> tasks = getTasks(definitionMap);
 
-        // Find steps associated with this state (simple heuristic - can be enhanced)
-        steps.forEach(step -> {
-            String stepName = (String) step.get("name");
-            String role = (String) step.get("role");
+        // Filter tasks for this specific state
+        tasks.stream()
+                .filter(task -> state.equals(task.get("state")))
+                .forEach(task -> {
+                    String taskName = (String) task.get("name");
+                    String role = (String) task.get("role");
+                    Boolean isAuto = (Boolean) task.get("auto");
 
-            String affectedEntities = null;
+                    String affectedEntities = null;
 
-            @SuppressWarnings("unchecked")
-            List<String> entitiesList = (List<String>) step.get("entities");
-            if (entitiesList != null && !entitiesList.isEmpty()) {
-                affectedEntities = String.join(",", entitiesList);
-            }
+                    @SuppressWarnings("unchecked")
+                    List<String> entitiesList = (List<String>) task.get("entities");
+                    if (entitiesList != null && !entitiesList.isEmpty()) {
+                        affectedEntities = String.join(",", entitiesList);
+                    }
 
-            TaskInstance task = TaskInstance.builder()
-                    .processInstanceId(processInstance.getId())
-                    .taskName(stepName)
-                    .assignedRole(role)
-                    .status(TaskInstance.TaskStatus.PENDING)
-                    .entityTypes(affectedEntities)
-                    .createdAt(LocalDateTime.now())
-                    .build();
+                    // Determine task status and completion time
+                    boolean isAutomated = (isAuto != null && isAuto);
+                    TaskInstance.TaskStatus status = isAutomated
+                            ? TaskInstance.TaskStatus.COMPLETED
+                            : TaskInstance.TaskStatus.PENDING;
 
-            taskInstanceRepository.save(task);
-            log.debug("Created task {} for process instance {} in state {}", stepName, processInstance.getId(), state);
-        });
+                    LocalDateTime completedAt = isAutomated ? LocalDateTime.now() : null;
+                    String assignedRole = isAutomated ? "SYSTEM" : role;
+                    String completedBy = isAutomated ? "SYSTEM" : null;
+
+                    TaskInstance taskInstance = TaskInstance.builder()
+                            .processInstanceId(processInstance.getId())
+                            .taskName(taskName)
+                            .assignedRole(assignedRole)
+                            .status(status)
+                            .entityTypes(affectedEntities)
+                            .createdAt(LocalDateTime.now())
+                            .completedAt(completedAt)
+                            .completedBy(completedBy)
+                            .build();
+
+                    taskInstanceRepository.save(taskInstance);
+                    log.debug("Created {} task {} for process instance {} in state {}",
+                            (isAuto != null && isAuto) ? "automated" : "manual",
+                            taskName, processInstance.getId(), state);
+                });
     }
 
     private void completeTasksForState(Long processInstanceId, String state, String userId) {
@@ -406,8 +423,8 @@ public class ProcessEngine {
     }
 
     @SuppressWarnings("unchecked")
-    private List<Map<String, Object>> getSteps(Map<String, Object> definitionMap) {
-        return (List<Map<String, Object>>) definitionMap.getOrDefault("steps", Collections.emptyList());
+    private List<Map<String, Object>> getTasks(Map<String, Object> definitionMap) {
+        return (List<Map<String, Object>>) definitionMap.getOrDefault("tasks", Collections.emptyList());
     }
 
     @SuppressWarnings("unchecked")

@@ -125,31 +125,32 @@ public class ProcessDefinitionLoader implements CommandLineRunner {
             {% endfor %}
             definition.put("transitions", transitions);
 
-            // Steps (tasks)
-            List<Map<String, Object>> steps = new ArrayList<>();
-            {% set step_counter = namespace(value=0) %}
+            // Tasks
+            List<Map<String, Object>> tasks = new ArrayList<>();
+            {% set task_counter = namespace(value=0) %}
             {% for elem in process.elements %}
-            {% if elem.__class__.__name__ == 'Step' %}
-            {% set step_counter.value = step_counter.value + 1 %}
-            Map<String, Object> step{{ step_counter.value }} = new HashMap<>();
-            step{{ step_counter.value }}.put("name", "{{ elem.name }}");
+            {% if elem.__class__.__name__ == 'Task' %}
+            {% set task_counter.value = task_counter.value + 1 %}
+            Map<String, Object> task{{ task_counter.value }} = new HashMap<>();
+            task{{ task_counter.value }}.put("name", "{{ elem.name }}");
+            task{{ task_counter.value }}.put("state", "{{ elem.state.name }}");
             {% if elem.role %}
-            step{{ step_counter.value }}.put("role", "{{ elem.role.name }}");
+            task{{ task_counter.value }}.put("role", "{{ elem.role.name }}");
+            {% endif %}
+            {% if elem.auto %}
+            task{{ task_counter.value }}.put("auto", true);
             {% endif %}
             {% if elem.entities %}
-            List<String> entities{{ step_counter.value }} = new ArrayList<>();
+            List<String> entities{{ task_counter.value }} = new ArrayList<>();
             {% for entity in elem.entities %}
-            entities{{ step_counter.value }}.add("{{ entity.name }}");
+            entities{{ task_counter.value }}.add("{{ entity.name }}");
             {% endfor %}
-            step{{ step_counter.value }}.put("entities", entities{{ step_counter.value }});
+            task{{ task_counter.value }}.put("entities", entities{{ task_counter.value }});
             {% endif %}
-            {% if elem.operation %}
-            step{{ step_counter.value }}.put("operation", "{{ elem.operation }}");
-            {% endif %}
-            steps.add(step{{ step_counter.value }});
+            tasks.add(task{{ task_counter.value }});
             {% endif %}
             {% endfor %}
-            definition.put("steps", steps);
+            definition.put("tasks", tasks);
 
             // Convert to JSON
             String definitionJson = objectMapper.writeValueAsString(definition);

@@ -51,19 +51,19 @@ process InvoiceApproval {
     state PaymentProcessingState
     state CompletedState
 
-    // Define workflow steps (demonstrating 0, 1, and multiple entities)
-    step CreateInvoice by Employee affects Invoice
-    step SubmitInvoice by Employee affects Invoice
-    step ReviewByManager by Manager affects Invoice, ApprovalRecord
-    step ReviewByFinance by FinanceTeam affects Invoice, ApprovalRecord
-    step ApprovalByCFO by CFO affects Invoice, ApprovalRecord
-    step ProcessPayment by CFO affects PaymentInfo
-    step RecordApproval by Manager affects ApprovalRecord
-    step RecordFinanceApproval by FinanceTeam affects ApprovalRecord
-    step RecordCFOApproval by CFO affects ApprovalRecord
-    step RejectInvoice by Manager affects Invoice
-    step CloseInvoice by CFO affects Invoice, PaymentInfo
-    step NotifyStakeholders by CFO
+    // Define workflow tasks (tasks belong to specific states)
+    task CreateInvoice in DraftState by Employee affects Invoice
+    task SubmitInvoice in DraftState auto affects Invoice
+    task ReviewByManager in SubmittedForApprovalState by Manager affects Invoice, ApprovalRecord
+    task ReviewByFinance in FinanceReviewState by FinanceTeam affects Invoice, ApprovalRecord
+    task ApprovalByCFO in CFOApprovalState by CFO affects Invoice, ApprovalRecord
+    task ProcessPayment in PaymentProcessingState by CFO affects PaymentInfo
+    task RecordApproval in ManagerReviewState by Manager affects ApprovalRecord
+    task RecordFinanceApproval in FinanceReviewState by FinanceTeam affects ApprovalRecord
+    task RecordCFOApproval in CFOApprovalState by CFO affects ApprovalRecord
+    task RejectInvoice in RejectedState by Manager affects Invoice
+    task CloseInvoice in CompletedState by CFO affects Invoice, PaymentInfo
+    task NotifyStakeholders in CompletedState auto
 
     // Define state transitions
     transition InitiateDraftTransition
@@ -166,15 +166,15 @@ process EmployeeOnboarding {
     state InTrainingState
     state ActiveState
 
-    // Steps
-    step SubmitDocuments by NewEmployee affects Employee
-    step VerifyDocuments by HR affects Employee
-    step RunBackgroundCheck by HR affects Employee
-    step SetupWorkstation by ITSupport affects Equipment
-    step AssignEquipment by ITSupport affects Equipment
-    step ScheduleOrientation by HR affects TrainingRecord
-    step ConductTraining by Trainer affects TrainingRecord
-    step ActivateEmployee by Supervisor affects Employee
+    // Tasks
+    task SubmitDocuments in NewState by NewEmployee affects Employee
+    task VerifyDocuments in DocumentsSubmittedState by HR affects Employee
+    task RunBackgroundCheck in BackgroundCheckState by HR affects Employee
+    task SetupWorkstation in EquipmentSetupState by ITSupport affects Equipment
+    task AssignEquipment in EquipmentSetupState by ITSupport affects Equipment
+    task ScheduleOrientation in TrainingScheduledState by HR affects TrainingRecord
+    task ConductTraining in InTrainingState by Trainer affects TrainingRecord
+    task ActivateEmployee in ActiveState by Supervisor affects Employee
 
     // Transitions
     transition SubmitEmployeeInfoTransition
