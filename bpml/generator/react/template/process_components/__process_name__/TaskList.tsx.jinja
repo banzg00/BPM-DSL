@@ -16,22 +16,37 @@ import {
   FormControl,
   InputLabel,
   Select,
-  MenuItem
+  MenuItem,
+  Dialog
 } from '@mui/material';
 import TaskService from '../../../services/TaskService';
-import { TaskInstance, TaskStatus } from '../../../types/types';
+import ProcessInstanceService from '../../../services/ProcessInstanceService';
+import { TaskInstance, TaskStatus, RoleHierarchy } from '../../../types/types';
+import EscalateTaskDialog from '../../shared/EscalateTaskDialog';
 
 const TaskList: React.FC = () => {
   const [tasks, setTasks] = useState<TaskInstance[]>([]);
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [filterRole, setFilterRole] = useState<string>('all');
+  const [escalateDialogOpen, setEscalateDialogOpen] = useState(false);
+  const [selectedTask, setSelectedTask] = useState<TaskInstance | null>(null);
+  const [roleHierarchy, setRoleHierarchy] = useState<RoleHierarchy>({});
   const navigate = useNavigate();
 
   const roles = [{% for role in process_roles %}'{{ role.name }}'{% if not loop.last %}, {% endif %}{% endfor %}];
 
   useEffect(() => {
     loadData();
+    loadRoleHierarchy();
   }, [filterStatus, filterRole]);
+
+  const loadRoleHierarchy = () => {
+    ProcessInstanceService.getRoleHierarchy('{{ process_name }}').then((hierarchy) => {
+      setRoleHierarchy(hierarchy);
+    }).catch((err) => {
+      console.error('Failed to load role hierarchy:', err);
+    });
+  };
 
   const loadData = () => {
     if (filterStatus !== 'all') {
@@ -81,6 +96,24 @@ const TaskList: React.FC = () => {
       TaskService.completeTask(taskId, userId).then(() => {
         loadData();
       });
+    }
+  };
+
+  const handleEscalateClick = (task: TaskInstance, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setSelectedTask(task);
+    setEscalateDialogOpen(true);
+  };
+
+  const handleEscalate = async (taskId: number, targetRole: string, reason: string) => {
+    const userId = prompt('Enter your user ID:');
+    if (userId) {
+      await TaskService.escalateTask(taskId, {
+        userId,
+        targetRole,
+        reason
+      });
+      loadData();
     }
   };
 
@@ -144,6 +177,7 @@ const TaskList: React.FC = () => {
               <TableCell>Status</TableCell>
               <TableCell>Assigned Role</TableCell>
               <TableCell>Assigned User</TableCell>
+              <TableCell>Escalation</TableCell>
               <TableCell>Created At</TableCell>
               <TableCell>Actions</TableCell>
             </TableRow>
@@ -154,7 +188,10 @@ const TaskList: React.FC = () => {
                 key={task.id}
                 hover
                 onClick={() => handleRowClick(task.processInstanceId)}
-                sx={{ "{{" }}  cursor: 'pointer'  {{ "}}" }}
+                sx={{ "{{" }}
+                  cursor: 'pointer',
+                  bgcolor: task.isEscalated ? 'warning.light' : 'inherit'
+                {{ "}}" }}
               >
                 <TableCell>{task.id}</TableCell>
                 <TableCell>{task.taskName}</TableCell>
@@ -165,8 +202,25 @@ const TaskList: React.FC = () => {
                     size="small"
                   />
                 </TableCell>
-                <TableCell>{task.assignedRole}</TableCell>
+                <TableCell>
+                  {task.assignedRole}
+                  {task.isEscalated && (
+                    <Chip
+                      label="Escalated"
+                      size="small"
+                      color="warning"
+                      sx={{ "{{" }} ml: 1 {{ "}}" }}
+                    />
+                  )}
+                </TableCell>
                 <TableCell>{task.assignedUser || '-'}</TableCell>
+                <TableCell>
+                  {task.isEscalated ? (
+                    <Typography variant="caption" color="text.secondary">
+                      From: {task.originalAssignedRole}
+                    </Typography>
+                  ) : '-'}
+                </TableCell>
                 <TableCell>{new Date(task.createdAt).toLocaleString()}</TableCell>
                 <TableCell>
                   {task.status === TaskStatus.PENDING && (
@@ -179,13 +233,24 @@ const TaskList: React.FC = () => {
                     </Button>
                   )}
                   {task.status === TaskStatus.IN_PROGRESS && (
-                    <Button
-                      size="small"
-                      variant="contained"
-                      onClick={(e) => handleCompleteTask(task.id, e)}
-                    >
-                      Complete
-                    </Button>
+                    <>
+                      <Button
+                        size="small"
+                        variant="contained"
+                        onClick={(e) => handleCompleteTask(task.id, e)}
+                        sx={{ "{{" }} mr: 1 {{ "}}" }}
+                      >
+                        Complete
+                      </Button>
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        color="warning"
+                        onClick={(e) => handleEscalateClick(task, e)}
+                      >
+                        Escalate
+                      </Button>
+                    </>
                   )}
                 </TableCell>
               </TableRow>
@@ -193,6 +258,16 @@ const TaskList: React.FC = () => {
           </TableBody>
         </Table>
       </TableContainer>
+
+      <EscalateTaskDialog
+        open={escalateDialogOpen}
+        task={selectedTask}
+        processName="{{ process_name }}"
+        currentUserId="current-user"
+        onClose={() => setEscalateDialogOpen(false)}
+        onEscalate={handleEscalate}
+        roleHierarchy={roleHierarchy}
+      />
     </Container>
   );
 };

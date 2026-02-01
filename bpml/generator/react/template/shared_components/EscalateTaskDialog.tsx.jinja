@@ -1,0 +1,170 @@
+import React, { useState, useEffect } from 'react';
+import {
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Button,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  TextField,
+  Alert,
+  CircularProgress,
+  Typography
+} from '@mui/material';
+import { TaskInstance, RoleHierarchy } from '../types/types';
+
+interface EscalateTaskDialogProps {
+  open: boolean;
+  task: TaskInstance | null;
+  processName: string;
+  currentUserId: string;
+  onClose: () => void;
+  onEscalate: (taskId: number, targetRole: string, reason: string) => Promise<void>;
+  roleHierarchy: RoleHierarchy;
+}
+
+const EscalateTaskDialog: React.FC<EscalateTaskDialogProps> = ({
+  open,
+  task,
+  processName,
+  currentUserId,
+  onClose,
+  onEscalate,
+  roleHierarchy
+}) => {
+  const [targetRole, setTargetRole] = useState('');
+  const [reason, setReason] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [availableSupervisorRoles, setAvailableSupervisorRoles] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (task && roleHierarchy) {
+      // Find roles that supervise the current task's assigned role
+      const supervisors: string[] = [];
+      Object.entries(roleHierarchy).forEach(([supervisor, supervisedRoles]) => {
+        if (supervisedRoles.includes(task.assignedRole)) {
+          supervisors.push(supervisor);
+        }
+      });
+      setAvailableSupervisorRoles(supervisors);
+
+      // Reset selections
+      setTargetRole('');
+      setReason('');
+      setError('');
+    }
+  }, [task, roleHierarchy]);
+
+  const handleEscalate = async () => {
+    if (!task) return;
+
+    // Validation
+    if (!targetRole) {
+      setError('Please select a supervisor role');
+      return;
+    }
+
+    if (!reason.trim()) {
+      setError('Please provide a reason for escalation');
+      return;
+    }
+
+    if (reason.trim().length < 10) {
+      setError('Reason must be at least 10 characters');
+      return;
+    }
+
+    setLoading(true);
+    setError('');
+
+    try {
+      await onEscalate(task.id, targetRole, reason);
+      onClose();
+    } catch (err: any) {
+      setError(err.response?.data?.message || err.message || 'Failed to escalate task');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
+      <DialogTitle>Escalate Task</DialogTitle>
+      <DialogContent>
+        {task && (
+          <>
+            <Alert severity="info" sx={{ "{{" }} mb: 2 {{ "}}" }}>
+              <Typography variant="body2">
+                <strong>Task:</strong> {task.taskName}<br />
+                <strong>Current Role:</strong> {task.assignedRole}
+              </Typography>
+            </Alert>
+
+            {availableSupervisorRoles.length === 0 ? (
+              <Alert severity="warning">
+                No supervisor roles defined for "{task.assignedRole}".
+                Cannot escalate this task.
+              </Alert>
+            ) : (
+              <>
+                <FormControl fullWidth sx={{ "{{" }} mb: 2, mt: 2 {{ "}}" }}>
+                  <InputLabel>Escalate To Role</InputLabel>
+                  <Select
+                    value={targetRole}
+                    label="Escalate To Role"
+                    onChange={(e) => setTargetRole(e.target.value)}
+                    disabled={loading}
+                  >
+                    {availableSupervisorRoles.map((role) => (
+                      <MenuItem key={role} value={role}>
+                        {role}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+
+                <TextField
+                  fullWidth
+                  multiline
+                  rows={4}
+                  label="Reason for Escalation"
+                  placeholder="Explain why this task needs to be escalated..."
+                  value={reason}
+                  onChange={(e) => setReason(e.target.value)}
+                  disabled={loading}
+                  required
+                  helperText="Minimum 10 characters required"
+                />
+
+                {error && (
+                  <Alert severity="error" sx={{ "{{" }} mt: 2 {{ "}}" }}>
+                    {error}
+                  </Alert>
+                )}
+              </>
+            )}
+          </>
+        )}
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={onClose} disabled={loading}>
+          Cancel
+        </Button>
+        <Button
+          onClick={handleEscalate}
+          variant="contained"
+          color="warning"
+          disabled={loading || availableSupervisorRoles.length === 0}
+        >
+          {loading ? <CircularProgress size={24} /> : 'Escalate'}
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+};
+
+export default EscalateTaskDialog;

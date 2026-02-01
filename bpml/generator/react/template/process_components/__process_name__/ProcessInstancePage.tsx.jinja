@@ -383,10 +383,23 @@ const ProcessInstancePage: React.FC = () => {
                 {tasks.map((task) => (
                   <Box
                     key={task.id}
-                    sx={{ "{{" }}  p: 2, border: '1px solid #e0e0e0', borderRadius: 1  {{ "}}" }}
+                    sx={{ "{{" }}
+                      p: 2,
+                      border: '1px solid #e0e0e0',
+                      borderRadius: 1,
+                      bgcolor: task.isEscalated ? 'warning.light' : 'inherit'
+                    {{ "}}" }}
                   >
                     <Typography variant="body1">
                       {task.taskName}
+                      {task.isEscalated && (
+                        <Chip
+                          label="Escalated"
+                          size="small"
+                          color="warning"
+                          sx={{ "{{" }} ml: 1 {{ "}}" }}
+                        />
+                      )}
                     </Typography>
                     <Box display="flex" gap={2} mt={1}>
                       <Chip label={task.status.replace("_", " ")} color={getTaskStatusColor(task.status)} size="small" />
@@ -399,6 +412,25 @@ const ProcessInstancePage: React.FC = () => {
                         </Typography>
                       )}
                     </Box>
+                    {task.isEscalated && (
+                      <Box mt={1} p={1} bgcolor="warning.lighter" borderRadius={1}>
+                        <Typography variant="caption" display="block" color="text.secondary">
+                          <strong>Escalation Info:</strong>
+                        </Typography>
+                        <Typography variant="caption" display="block">
+                          From: {task.originalAssignedRole} -&gt; To: {task.escalatedToRole}
+                        </Typography>
+                        <Typography variant="caption" display="block">
+                          By: {task.escalatedBy}
+                        </Typography>
+                        <Typography variant="caption" display="block">
+                          Reason: {task.escalationReason}
+                        </Typography>
+                        <Typography variant="caption" display="block" color="text.secondary">
+                          {task.escalatedAt && new Date(task.escalatedAt).toLocaleString()}
+                        </Typography>
+                      </Box>
+                    )}
                   </Box>
                 ))}
               </Box>

@@ -34,12 +34,11 @@ process InvoiceApproval {
         transactionId: string
     }
 
-    // Define roles in the process
+    // Define roles in the process with hierarchy
     role Employee
-    role Manager
+    role Manager supervises Employee
     role FinanceTeam
-    role CFO
-    role AccountsPayable
+    role CFO supervises Manager, FinanceTeam
 
     // Define process states
     state DraftState
@@ -58,13 +57,13 @@ process InvoiceApproval {
     step ReviewByManager by Manager affects Invoice, ApprovalRecord
     step ReviewByFinance by FinanceTeam affects Invoice, ApprovalRecord
     step ApprovalByCFO by CFO affects Invoice, ApprovalRecord
-    step ProcessPayment by AccountsPayable affects PaymentInfo
+    step ProcessPayment by CFO affects PaymentInfo
     step RecordApproval by Manager affects ApprovalRecord
     step RecordFinanceApproval by FinanceTeam affects ApprovalRecord
     step RecordCFOApproval by CFO affects ApprovalRecord
     step RejectInvoice by Manager affects Invoice
-    step CloseInvoice by AccountsPayable affects Invoice, PaymentInfo
-    step NotifyStakeholders
+    step CloseInvoice by CFO affects Invoice, PaymentInfo
+    step NotifyStakeholders by CFO
 
     // Define state transitions
     transition InitiateDraftTransition
@@ -110,12 +109,12 @@ process InvoiceApproval {
     transition SendToPaymentTransition
         from ApprovedState
         to PaymentProcessingState
-        by AccountsPayable
+        by CFO
 
     transition CompleteProcessTransition
         from PaymentProcessingState
         to CompletedState
-        by AccountsPayable
+        by CFO
 
     // Define the process flow
     flow CreateInvoice, SubmitInvoice, ReviewByManager, ReviewByFinance, ApprovalByCFO, ProcessPayment, CloseInvoice
@@ -150,12 +149,12 @@ process EmployeeOnboarding {
         isPassed: boolean
     }
 
-    // Roles
-    role HR
-    role ITSupport
-    role Supervisor
-    role Trainer
+    // Roles with hierarchy
     role NewEmployee
+    role HR supervises NewEmployee
+    role ITSupport
+    role Trainer
+    role Supervisor supervises HR, ITSupport, Trainer
 
     // States
     state NewState

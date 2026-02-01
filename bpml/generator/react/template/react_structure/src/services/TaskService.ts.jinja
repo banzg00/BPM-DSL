@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { TaskInstance } from '../types/types';
+import { TaskInstance, EscalateTaskRequest } from '../types/types';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080/api';
 
@@ -95,6 +95,18 @@ class TaskService {
     .then(response => response.data)
     .catch(error => {
       console.error(`Error cancelling task ${id}:`, error);
+      throw error;
+    });
+  }
+
+  escalateTask(id: number, request: EscalateTaskRequest) {
+    return axios.post<TaskInstance>(
+      `${API_BASE_URL}/tasks/${id}/escalate`,
+      request
+    )
+    .then(response => response.data)
+    .catch(error => {
+      console.error(`Error escalating task ${id}:`, error);
       throw error;
     });
   }

@@ -544,4 +544,51 @@ public class ProcessEngine {
             }
         }
     }
+
+    /**
+     * Validate if targetRole can supervise currentRole
+     */
+    public boolean validateRoleHierarchy(Long processInstanceId, String currentRole, String targetRole) {
+        ProcessInstance processInstance = processInstanceRepository.findById(processInstanceId)
+                .orElseThrow(() -> new NotFoundException("Process instance not found: " + processInstanceId));
+
+        ProcessDefinition definition = processDefinitionRepository.findByProcessName(processInstance.getProcessName())
+                .orElseThrow(() -> new NotFoundException("Process definition not found: " + processInstance.getProcessName()));
+
+        Map<String, Object> definitionMap = parseDefinitionJson(definition.getDefinitionJson());
+
+        @SuppressWarnings("unchecked")
+        Map<String, List<String>> roleHierarchy =
+                (Map<String, List<String>>) definitionMap.get("roleHierarchy");
+
+        if (roleHierarchy == null || roleHierarchy.isEmpty()) {
+            log.warn("No role hierarchy defined for process {}", processInstance.getProcessName());
+            return false;
+        }
+
+        // Check if targetRole supervises currentRole
+        List<String> supervisedRoles = roleHierarchy.get(targetRole);
+        if (supervisedRoles == null) {
+            return false;
+        }
+
+        return supervisedRoles.contains(currentRole);
+    }
+
+    /**
+     * Get role hierarchy for a process
+     */
+    @Transactional(readOnly = true)
+    public Map<String, List<String>> getRoleHierarchy(String processName) {
+        ProcessDefinition definition = processDefinitionRepository.findByProcessName(processName)
+                .orElseThrow(() -> new NotFoundException("Process definition not found: " + processName));
+
+        Map<String, Object> definitionMap = parseDefinitionJson(definition.getDefinitionJson());
+
+        @SuppressWarnings("unchecked")
+        Map<String, List<String>> roleHierarchy =
+                (Map<String, List<String>>) definitionMap.getOrDefault("roleHierarchy", Collections.emptyMap());
+
+        return roleHierarchy;
+    }
 }

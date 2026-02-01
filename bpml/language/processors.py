@@ -63,6 +63,9 @@ def _validate_process_structure(process):
             )
         role_names.add(role.name)
 
+    # Validate role hierarchy
+    _validate_role_hierarchy(roles, process.name)
+
     # Validate steps
     step_names = set()
     for step in steps:
@@ -98,6 +101,28 @@ def _validate_flow(flow, valid_step_names, process_name):
             raise TextXSemanticError(
                 f"Flow references unknown step '{step_ref.name}' in process '{process_name}'"
             )
+
+
+def _validate_role_hierarchy(roles, process_name):
+    """Validate role hierarchy for cycles and invalid references"""
+    role_names = {role.name for role in roles}
+
+    for role in roles:
+        # Check if role has supervised roles
+        if hasattr(role, 'supervised_roles') and role.supervised_roles:
+            # Validate supervised role references exist
+            for supervised_role in role.supervised_roles:
+                if supervised_role.name not in role_names:
+                    raise TextXSemanticError(
+                        f"Role '{role.name}' supervises unknown role '{supervised_role.name}' in process '{process_name}'"
+                    )
+
+            # Check for self-supervision
+            supervised_names = {r.name for r in role.supervised_roles}
+            if role.name in supervised_names:
+                raise TextXSemanticError(
+                    f"Role '{role.name}' cannot supervise itself in process '{process_name}'"
+                )
 
 
 # Utility functions for getting model information

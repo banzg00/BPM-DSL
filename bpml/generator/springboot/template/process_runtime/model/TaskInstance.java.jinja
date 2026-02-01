@@ -60,6 +60,28 @@ public class TaskInstance {
     @Column(name = "completed_by")
     private String completedBy;
 
+    // Escalation tracking fields
+    @Column(name = "original_assigned_role")
+    private String originalAssignedRole;
+
+    @Column(name = "original_assigned_user")
+    private String originalAssignedUser;
+
+    @Column(name = "escalated_by")
+    private String escalatedBy;
+
+    @Column(name = "escalated_to_role")
+    private String escalatedToRole;
+
+    @Column(name = "escalation_reason", columnDefinition = "TEXT")
+    private String escalationReason;
+
+    @Column(name = "escalated_at")
+    private LocalDateTime escalatedAt;
+
+    @Column(name = "is_escalated")
+    private Boolean isEscalated = false;
+
     @PrePersist
     protected void onCreate() {
         if (createdAt == null) {

@@ -74,13 +74,37 @@ public class ProcessDefinitionLoader implements CommandLineRunner {
             definition.put("finalStates", finalStates);
 
             // Roles
-            List<Map<String, String>> roles = new ArrayList<>();
+            List<Map<String, Object>> roles = new ArrayList<>();
             {% for elem in process.elements %}
             {% if elem.__class__.__name__ == 'Role' %}
-            roles.add(Map.of("name", "{{ elem.name }}"));
+            {% set outer_index = loop.index %}
+            Map<String, Object> role{{ outer_index }} = new HashMap<>();
+            role{{ outer_index }}.put("name", "{{ elem.name }}");
+            {% if elem.supervised_roles %}
+            List<String> supervisedRoles{{ outer_index }} = new ArrayList<>();
+            {% for supervised in elem.supervised_roles %}
+            supervisedRoles{{ outer_index }}.add("{{ supervised.name }}");
+            {% endfor %}
+            role{{ outer_index }}.put("supervisedRoles", supervisedRoles{{ outer_index }});
+            {% endif %}
+            roles.add(role{{ outer_index }});
             {% endif %}
             {% endfor %}
             definition.put("roles", roles);
+
+            // Role hierarchy (supervisor -> list of supervised roles)
+            Map<String, List<String>> roleHierarchy = new HashMap<>();
+            {% for elem in process.elements %}
+            {% if elem.__class__.__name__ == 'Role' and elem.supervised_roles %}
+            {% set outer_index = loop.index %}
+            List<String> supervisedList{{ outer_index }} = new ArrayList<>();
+            {% for supervised_role in elem.supervised_roles %}
+            supervisedList{{ outer_index }}.add("{{ supervised_role.name }}");
+            {% endfor %}
+            roleHierarchy.put("{{ elem.name }}", supervisedList{{ outer_index }});
+            {% endif %}
+            {% endfor %}
+            definition.put("roleHierarchy", roleHierarchy);
 
             // Transitions
             List<Map<String, Object>> transitions = new ArrayList<>();

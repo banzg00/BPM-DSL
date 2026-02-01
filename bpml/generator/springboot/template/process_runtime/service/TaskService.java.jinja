@@ -1,5 +1,6 @@
 package {{ group_name }}.{{ app_name_lower }}.service;
 
+import {{ group_name }}.{{ app_name_lower }}.dto.EscalateTaskRequest;
 import {{ group_name }}.{{ app_name_lower }}.dto.TaskInstanceDTO;
 import {{ group_name }}.{{ app_name_lower }}.model.TaskInstance;
 import {{ group_name }}.{{ app_name_lower }}.repository.TaskInstanceRepository;
@@ -8,6 +9,8 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -24,6 +27,11 @@ public class TaskService {
 
     private final TaskInstanceRepository repository;
     private final ObjectMapper objectMapper;
+
+    // Lazy injection to avoid circular dependency
+    @Lazy
+    @Autowired
+    private ProcessEngine processEngine;
 
     /**
      * Get all tasks
@@ -196,6 +204,64 @@ public class TaskService {
         return mapToDTO(savedTask);
     }
 
+    /**
+     * Escalate a task to a higher-level role (supervisor)
+     */
+    @Transactional
+    public TaskInstanceDTO escalateTask(Long taskId, EscalateTaskRequest request) {
+        log.info("User {} escalating task {} to role {}",
+                request.getUserId(), taskId, request.getTargetRole());
+
+        TaskInstance task = repository.findById(taskId)
+                .orElseThrow(() -> new NotFoundException("Task instance not found with id: " + taskId));
+
+        // Validate task status
+        if (task.getStatus() != TaskInstance.TaskStatus.PENDING &&
+                task.getStatus() != TaskInstance.TaskStatus.IN_PROGRESS) {
+            throw new IllegalStateException(
+                    "Cannot escalate task with status: " + task.getStatus());
+        }
+
+        // Validate reason is provided
+        if (request.getReason() == null || request.getReason().trim().isEmpty()) {
+            throw new IllegalArgumentException("Escalation reason is required");
+        }
+
+        // Validate role hierarchy using ProcessEngine
+        boolean isValidEscalation = processEngine.validateRoleHierarchy(
+                task.getProcessInstanceId(),
+                task.getAssignedRole(),
+                request.getTargetRole()
+        );
+
+        if (!isValidEscalation) {
+            throw new IllegalStateException(String.format(
+                    "Role '%s' cannot escalate to '%s'. Target role must supervise current role.",
+                    task.getAssignedRole(), request.getTargetRole()));
+        }
+
+        // Store original assignment (only first time)
+        if (!Boolean.TRUE.equals(task.getIsEscalated())) {
+            task.setOriginalAssignedRole(task.getAssignedRole());
+            task.setOriginalAssignedUser(task.getAssignedUser());
+        }
+
+        // Update task for escalation
+        task.setAssignedRole(request.getTargetRole());
+        task.setAssignedUser(null);  // Unassign user, back to role pool
+        task.setStatus(TaskInstance.TaskStatus.PENDING);  // Back to pending
+        task.setEscalatedBy(request.getUserId());
+        task.setEscalatedToRole(request.getTargetRole());
+        task.setEscalationReason(request.getReason());
+        task.setEscalatedAt(LocalDateTime.now());
+        task.setIsEscalated(true);
+
+        TaskInstance savedTask = repository.save(task);
+        log.info("Task {} escalated to role {}", taskId, request.getTargetRole());
+
+        return mapToDTO(savedTask);
+    }
+
     private TaskInstanceDTO mapToDTO(TaskInstance task) {
         // Parse entityTypes from comma-separated string to list
         List<String> entityTypesList = null;
@@ -217,6 +283,14 @@ public class TaskService {
                 .claimedAt(task.getClaimedAt())
                 .completedAt(task.getCompletedAt())
                 .completedBy(task.getCompletedBy())
+                // Escalation fields
+                .originalAssignedRole(task.getOriginalAssignedRole())
+                .originalAssignedUser(task.getOriginalAssignedUser())
+                .escalatedBy(task.getEscalatedBy())
+                .escalatedToRole(task.getEscalatedToRole())
+                .escalationReason(task.getEscalationReason())
+                .escalatedAt(task.getEscalatedAt())
+                .isEscalated(task.getIsEscalated())
                 .build();
     }
 

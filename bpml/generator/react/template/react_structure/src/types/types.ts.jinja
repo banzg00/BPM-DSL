@@ -64,6 +64,14 @@ export interface TaskInstance {
   claimedAt?: string;
   completedAt?: string;
   completedBy?: string;
+  // Escalation fields
+  originalAssignedRole?: string;
+  originalAssignedUser?: string;
+  escalatedBy?: string;
+  escalatedToRole?: string;
+  escalationReason?: string;
+  escalatedAt?: string;
+  isEscalated?: boolean;
 }
 
 export interface AvailableTransition {
@@ -95,4 +103,14 @@ export interface ExecuteTransitionRequest {
   executedBy: string;
   userRole: string;
   comments?: string;
+}
+
+export interface EscalateTaskRequest {
+  userId: string;
+  targetRole: string;
+  reason: string;
+}
+
+export interface RoleHierarchy {
+  [supervisorRole: string]: string[];  // supervisor -> list of supervised roles
 }

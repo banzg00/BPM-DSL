@@ -41,7 +41,7 @@ Enum:
 ;
 
 Role:
-    'role' name=ID
+    'role' name=ID ('supervises' supervised_roles+=[Role][','])?
 ;
 
 State:
@@ -57,7 +57,7 @@ Transition:
 
 Step:
     'step' name=ID
-    ('by' role=[Role])?
+    'by' role=[Role]
     ('affects' entities+=[Entity][','])?
 ;
 

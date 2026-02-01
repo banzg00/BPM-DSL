@@ -1,5 +1,6 @@
 package {{ group_name }}.{{ app_name_lower }}.controller;
 
+import {{ group_name }}.{{ app_name_lower }}.dto.EscalateTaskRequest;
 import {{ group_name }}.{{ app_name_lower }}.dto.TaskInstanceDTO;
 import {{ group_name }}.{{ app_name_lower }}.model.TaskInstance.TaskStatus;
 import {{ group_name }}.{{ app_name_lower }}.service.TaskService;
@@ -142,6 +143,20 @@ public class TaskController {
     public ResponseEntity<TaskInstanceDTO> releaseTask(@PathVariable Long id) {
         log.info("POST /api/tasks/{}/release - Releasing task", id);
         TaskInstanceDTO task = taskService.releaseTask(id);
+        return ResponseEntity.ok(task);
+    }
+
+    /**
+     * Escalate a task to a supervisor role
+     */
+    @PostMapping("/{id}/escalate")
+    public ResponseEntity<TaskInstanceDTO> escalateTask(
+            @PathVariable Long id,
+            @RequestBody EscalateTaskRequest request) {
+        log.info("POST /api/tasks/{}/escalate - User {} escalating to role {}",
+                id, request.getUserId(), request.getTargetRole());
+
+        TaskInstanceDTO task = taskService.escalateTask(id, request);
         return ResponseEntity.ok(task);
     }
 }

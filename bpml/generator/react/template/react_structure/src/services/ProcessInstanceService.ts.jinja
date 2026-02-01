@@ -4,7 +4,8 @@ import {
   StartProcessRequest,
   AvailableTransition,
   ExecuteTransitionRequest,
-  TransitionHistory
+  TransitionHistory,
+  RoleHierarchy
 } from '../types/types';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080/api';
@@ -154,6 +155,17 @@ class ProcessInstanceService {
     .then(response => response.data)
     .catch(error => {
       console.error(`Error resuming process instance ${id}:`, error);
+      throw error;
+    });
+  }
+
+  getRoleHierarchy(processName: string) {
+    return axios.get<RoleHierarchy>(
+      `${API_BASE_URL}/processes/definitions/${processName}/role-hierarchy`
+    )
+    .then(response => response.data)
+    .catch(error => {
+      console.error(`Error fetching role hierarchy for ${processName}:`, error);
       throw error;
     });
   }

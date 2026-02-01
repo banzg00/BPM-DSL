@@ -1,0 +1,17 @@
+package {{ group_name }}.{{ app_name_lower }}.dto;
+
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class EscalateTaskRequest {
+
+    private String userId;        // User initiating escalation
+    private String targetRole;    // Role to escalate to
+    private String reason;        // Required justification
+}

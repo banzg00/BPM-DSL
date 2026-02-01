@@ -181,4 +181,15 @@ public class ProcessInstanceController {
         ProcessInstanceDTO result = processEngine.resumeProcess(id, userId);
         return ResponseEntity.ok(result);
     }
+
+    /**
+     * Get role hierarchy for a process
+     */
+    @GetMapping("/definitions/{processName}/role-hierarchy")
+    public ResponseEntity<Map<String, List<String>>> getRoleHierarchy(
+            @PathVariable String processName) {
+        log.info("GET /api/processes/definitions/{}/role-hierarchy", processName);
+        Map<String, List<String>> hierarchy = processEngine.getRoleHierarchy(processName);
+        return ResponseEntity.ok(hierarchy);
+    }
 }
