@@ -14,12 +14,13 @@ ProjectInfo:
 
 Process:
     'process' name=ID '{'
-        elements*=Element
+        entities+=Entity
+        roles+=Role
+        states+=State
+        tasks+=Task
+        transitions+=Transition
+        flow=Flow
     '}'
-;
-
-Element:
-    Entity | Role | State | Transition | Task | Flow
 ;
 
 Entity:

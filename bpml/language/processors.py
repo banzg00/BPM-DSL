@@ -41,126 +41,135 @@ def _validate_processes(processes):
 
 def _validate_process_structure(process):
     """Validate the structure of a single process"""
-    entities = process.entities if hasattr(process, "entities") else []
-    roles = process.roles if hasattr(process, "roles") else []
-    states = process.states if hasattr(process, "states") else []
-    tasks = process.tasks if hasattr(process, "tasks") else []
+    entities = process.entities
+    roles = process.roles
+    states = process.states
+    tasks = process.tasks
 
     # Validate entities
+    entity_names = _validate_entities(entities, process.name)
+
+    # Validate roles
+    role_names = _validate_roles(roles, process.name)
+
+    # Validate states
+    state_names = _validate_states(states, process.name)
+
+    # Validate tasks
+    task_names = _validate_tasks(
+        tasks, state_names, role_names, entity_names, process.name
+    )
+
+    # Validate flow
+    _validate_flow(process.flow, task_names, process.name)
+
+
+def _validate_entities(entities, process_name) -> set[str]:
+    """Validate entity definitions for duplicates"""
     entity_names = set()
     for entity in entities:
         if entity.name in entity_names:
             raise TextXSemanticError(
-                f"Duplicate entity name '{entity.name}' in process '{process.name}'"
+                f"Duplicate entity name '{entity.name}' in process '{process_name}'"
             )
         entity_names.add(entity.name)
 
-    # Validate roles
+    return entity_names
+
+
+def _validate_roles(roles, process_name) -> set[str]:
+    """Validate role hierarchy for cycles and invalid references"""
     role_names = set()
     for role in roles:
         if role.name in role_names:
             raise TextXSemanticError(
-                f"Duplicate role name '{role.name}' in process '{process.name}'"
+                f"Duplicate role name '{role.name}' in process '{process_name}'"
             )
+        if hasattr(role, "supervised_roles") and role.supervised_roles:
+            for supervised_role in role.supervised_roles:
+                if supervised_role.name == role.name:
+                    raise TextXSemanticError(
+                        f"Role '{role.name}' cannot supervise itself in process '{process_name}'"
+                    )
+
+                if supervised_role.name not in role_names:
+                    raise TextXSemanticError(
+                        f"Role '{role.name}' supervises unknown role '{supervised_role.name}' in process '{process_name}'"
+                    )
+
         role_names.add(role.name)
 
-    # Validate role hierarchy
-    _validate_role_hierarchy(roles, process.name)
+    return role_names
 
-    # Validate states
+
+def _validate_states(states, process_name) -> set[str]:
+    """Validate state definitions for duplicates"""
     state_names = set()
     for state in states:
         if state.name in state_names:
             raise TextXSemanticError(
-                f"Duplicate state name '{state.name}' in process '{process.name}'"
+                f"Duplicate state name '{state.name}' in process '{process_name}'"
             )
         state_names.add(state.name)
 
-    # Validate tasks
+    return state_names
+
+
+def _validate_tasks(
+    tasks, state_names, role_names, entity_names, process_name
+) -> set[str]:
+    """Validate task definitions for duplicates and missing required fields"""
     task_names = set()
     for task in tasks:
         if task.name in task_names:
             raise TextXSemanticError(
-                f"Duplicate task name '{task.name}' in process '{process.name}'"
+                f"Duplicate task name '{task.name}' in process '{process_name}'"
             )
-        task_names.add(task.name)
 
         # Validate state reference
         if task.state and task.state.name not in state_names:
             raise TextXSemanticError(
-                f"Task '{task.name}' references unknown state '{task.state.name}' in process '{process.name}'"
+                f"Task '{task.name}' references unknown state '{task.state.name}' in process '{process_name}'"
             )
 
         # Validate that task has either a role or is automated (not both, not neither)
-        is_auto = hasattr(task, 'auto') and task.auto
-        has_role = hasattr(task, 'role') and task.role
+        is_auto = hasattr(task, "auto") and task.auto
+        has_role = hasattr(task, "role") and task.role
 
-        if not is_auto and not has_role:
+        if (not is_auto and not has_role) or (is_auto and has_role):
             raise TextXSemanticError(
-                f"Task '{task.name}' must be either automated (use 'auto') or assigned to a role (use 'by RoleName') in process '{process.name}'"
+                f"Task '{task.name}' must be either automated (use 'auto') or assigned to a role (use 'by RoleName') in process '{process_name}'"
             )
 
         # Validate role references
         if has_role and task.role.name not in role_names:
             raise TextXSemanticError(
-                f"Task '{task.name}' references unknown role '{task.role.name}' in process '{process.name}'"
+                f"Task '{task.name}' references unknown role '{task.role.name}' in process '{process_name}'"
             )
 
-        # Validate entities (now optional and plural)
-        if hasattr(task, 'entities') and task.entities:
+        # Validate entities
+        if hasattr(task, "entities") and task.entities:
             for entity in task.entities:
                 if entity.name not in entity_names:
                     raise TextXSemanticError(
-                        f"Task '{task.name}' references unknown entity '{entity.name}' in process '{process.name}'"
+                        f"Task '{task.name}' references unknown entity '{entity.name}' in process '{process_name}'"
                     )
 
-        # Validate dependencies (optional)
-        if hasattr(task, 'dependencies') and task.dependencies:
+        # Validate dependencies
+        if hasattr(task, "dependencies") and task.dependencies:
             for dep_task in task.dependencies:
+                if dep_task.name == task.name:
+                    raise TextXSemanticError(
+                        f"Task '{task.name}' cannot depend on itself in process '{process_name}'"
+                    )
                 if dep_task.name not in task_names:
                     raise TextXSemanticError(
-                        f"Task '{task.name}' depends on unknown task '{dep_task.name}' in process '{process.name}'"
+                        f"Task '{task.name}' depends on unknown task '{dep_task.name}' in process '{process_name}'"
                     )
 
-    # Validate task dependencies for cycles
-    _validate_task_dependencies(tasks, process.name)
+        task_names.add(task.name)
 
-    # Validate flow
-    if hasattr(process, "flow") and process.flow:
-        _validate_flow(process.flow, task_names, process.name)
-
-
-def _validate_task_dependencies(tasks, process_name):
-    """Validate task dependencies for circular references"""
-    def has_cycle(task, visited, rec_stack, task_map):
-        """DFS to detect cycles in task dependencies"""
-        visited.add(task.name)
-        rec_stack.add(task.name)
-
-        if hasattr(task, 'dependencies') and task.dependencies:
-            for dep_task in task.dependencies:
-                dep_name = dep_task.name
-                if dep_name not in visited:
-                    if has_cycle(task_map[dep_name], visited, rec_stack, task_map):
-                        return True
-                elif dep_name in rec_stack:
-                    return True
-
-        rec_stack.remove(task.name)
-        return False
-
-    # Build task name to task object map
-    task_map = {task.name: task for task in tasks}
-
-    # Check for cycles starting from each task
-    visited = set()
-    for task in tasks:
-        if task.name not in visited:
-            rec_stack = set()
-            if has_cycle(task, visited, rec_stack, task_map):
-                raise TextXSemanticError(
-                    f"Circular dependency detected in task dependencies in process '{process_name}'"
-                )
+    return task_names
 
 
 def _validate_flow(flow, valid_task_names, process_name):
@@ -170,28 +179,6 @@ def _validate_flow(flow, valid_task_names, process_name):
             raise TextXSemanticError(
                 f"Flow references unknown task '{task_ref.name}' in process '{process_name}'"
             )
-
-
-def _validate_role_hierarchy(roles, process_name):
-    """Validate role hierarchy for cycles and invalid references"""
-    role_names = {role.name for role in roles}
-
-    for role in roles:
-        # Check if role has supervised roles
-        if hasattr(role, 'supervised_roles') and role.supervised_roles:
-            # Validate supervised role references exist
-            for supervised_role in role.supervised_roles:
-                if supervised_role.name not in role_names:
-                    raise TextXSemanticError(
-                        f"Role '{role.name}' supervises unknown role '{supervised_role.name}' in process '{process_name}'"
-                    )
-
-            # Check for self-supervision
-            supervised_names = {r.name for r in role.supervised_roles}
-            if role.name in supervised_names:
-                raise TextXSemanticError(
-                    f"Role '{role.name}' cannot supervise itself in process '{process_name}'"
-                )
 
 
 # Utility functions for getting model information
