@@ -71,15 +71,11 @@ def generate_entity_components(context, filters, model, output_path, overwrite):
     entity_to_processes = {}  # Map entity name to list of processes that use it
 
     for process in model.processes:
-        if hasattr(process, 'elements') and process.elements:
-            entities = [elem for elem in process.elements if elem.__class__.__name__ == 'Entity']
-
-            # Track which processes use which entities
-            for entity in entities:
-                if entity.name not in entity_to_processes:
-                    entity_to_processes[entity.name] = []
-                    all_entities.append(entity)
-                entity_to_processes[entity.name].append(process)
+        for entity in process.entities:
+            if entity.name not in entity_to_processes:
+                entity_to_processes[entity.name] = []
+                all_entities.append(entity)
+            entity_to_processes[entity.name].append(process)
 
     # Generate components for each entity
     for entity in all_entities:
@@ -106,9 +102,7 @@ def generate_entity_services(context, filters, model, output_path, overwrite):
     # Collect all entities from all processes
     all_entities = []
     for process in model.processes:
-        if hasattr(process, 'elements') and process.elements:
-            entities = [elem for elem in process.elements if elem.__class__.__name__ == 'Entity']
-            all_entities.extend(entities)
+        all_entities.extend(process.entities)
 
     # Generate service for each entity
     for entity in all_entities:
@@ -130,47 +124,26 @@ def generate_process_components(context, filters, model, output_path, overwrite)
 
     # Collect all entities from all processes for linking
     all_entities = []
+    seen_entity_names = set()
     for proc in model.processes:
-        if hasattr(proc, 'elements') and proc.elements:
-            entities = [elem for elem in proc.elements if elem.__class__.__name__ == 'Entity']
-            for entity in entities:
-                if entity.name not in [e.name for e in all_entities]:
-                    all_entities.append(entity)
+        for entity in proc.entities:
+            if entity.name not in seen_entity_names:
+                all_entities.append(entity)
+                seen_entity_names.add(entity.name)
 
     # Generate components for each process
     for process in model.processes:
-        # Extract process elements
-        process_states = []
-        process_roles = []
-        process_steps = []
-        process_transitions = []
-        process_entities = []
-
-        if hasattr(process, 'elements') and process.elements:
-            for elem in process.elements:
-                elem_type = elem.__class__.__name__
-                if elem_type == 'State':
-                    process_states.append(elem)
-                elif elem_type == 'Role':
-                    process_roles.append(elem)
-                elif elem_type == 'Step':
-                    process_steps.append(elem)
-                elif elem_type == 'Transition':
-                    process_transitions.append(elem)
-                elif elem_type == 'Entity':
-                    process_entities.append(elem)
-
         # Update context with process-specific data
         context['process'] = process
         context['process_name'] = process.name
         context['process_name_cap'] = capitalize_str(process.name)
         context['process_name_lower'] = lower_first_str(process.name)
         context['process_name_dash'] = dash_case(process.name)
-        context['process_states'] = process_states
-        context['process_roles'] = process_roles
-        context['process_steps'] = process_steps
-        context['process_transitions'] = process_transitions
-        context['entities'] = all_entities  # Pass all entities for linked entity display
+        context['process_states'] = process.states
+        context['process_roles'] = process.roles
+        context['process_tasks'] = process.tasks
+        context['process_transitions'] = process.transitions
+        context['entities'] = all_entities
 
         # Generate process components
         components_folder = os.path.join(output_path, 'src/components/processes')
@@ -219,10 +192,8 @@ def get_context(model):
     all_entities = []
     all_entity_names = []
     for process in model.processes:
-        if hasattr(process, 'elements') and process.elements:
-            entities = [elem for elem in process.elements if elem.__class__.__name__ == 'Entity']
-            all_entities.extend(entities)
-            all_entity_names.extend([e.name for e in entities])
+        all_entities.extend(process.entities)
+        all_entity_names.extend([e.name for e in process.entities])
 
     context = {
         'app_name': project_name if project_name else 'BpmlApp',
@@ -236,3 +207,5 @@ def get_context(model):
     }
 
     return context
+
+

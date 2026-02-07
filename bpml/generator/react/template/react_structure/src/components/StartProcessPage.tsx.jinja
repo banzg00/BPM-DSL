@@ -27,13 +27,9 @@ const StartProcessPage: React.FC = () => {
       name: '{{ process.name }}',
       description: '{{ process.name }} process',
       allowedEntityTypes: [
-        {% if process.elements %}
-        {% for elem in process.elements %}
-        {% if elem.__class__.__name__ == 'Entity' %}
-        '{{ elem.name }}',
-        {% endif %}
+        {% for entity in process.entities %}
+        '{{ entity.name }}',
         {% endfor %}
-        {% endif %}
       ],
     },
     {% endfor %}

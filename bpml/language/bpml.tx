@@ -19,7 +19,6 @@ Process:
         states+=State
         tasks+=Task
         transitions+=Transition
-        flow=Flow
     '}'
 ;
 
@@ -62,10 +61,6 @@ Task:
     (('by' role=[Role]) | auto?='auto')
     ('affects' entities+=[Entity][','])?
     ('depends_on' dependencies+=[Task][','])?
-;
-
-Flow:
-    'flow' tasks+=[Task][',']
 ;
 
 Comment:

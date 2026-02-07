@@ -70,10 +70,7 @@ def generate_entity_files(context, filters, main_folder_path, model, overwrite):
     # Collect all Entity elements from all processes
     all_entities = []
     for process in model.processes:
-        if hasattr(process, 'elements') and process.elements:
-            # Filter only Entity type from elements (not Role, State, Transition, Step, Flow)
-            entities = [elem for elem in process.elements if elem.__class__.__name__ == 'Entity']
-            all_entities.extend(entities)
+        all_entities.extend(process.entities)
 
     # Generate CRUD for each entity
     for entity in all_entities:
@@ -108,26 +105,12 @@ def generate_process_runtime_files(context, filters, main_folder_path, model, ov
 
     # Generate runtime support for each process
     for process in model.processes:
-        # Extract states from process elements
-        process_states = []
-        process_roles = []
-        process_steps = []
-
-        if hasattr(process, 'elements') and process.elements:
-            for elem in process.elements:
-                elem_type = elem.__class__.__name__
-                if elem_type == 'State':
-                    process_states.append(elem)
-                elif elem_type == 'Role':
-                    process_roles.append(elem)
-                elif elem_type == 'Step':
-                    process_steps.append(elem)
-
         # Update context with process-specific data
         context['process_name'] = process.name
-        context['process_states'] = process_states
-        context['process_roles'] = process_roles
-        context['process_steps'] = process_steps
+        context['process_states'] = process.states
+        context['process_roles'] = process.roles
+        context['process_tasks'] = process.tasks
+        context['process_transitions'] = process.transitions
 
         # Run Jinja generator
         textx_jinja_generator(process_runtime_template, main_folder_path, context, overwrite, filters=filters)
@@ -182,11 +165,8 @@ def get_context(model):
     all_entities = []
     all_entity_names = []
     for process in model.processes:
-        if hasattr(process, 'elements') and process.elements:
-            # Filter only Entity type from elements
-            entities = [elem for elem in process.elements if elem.__class__.__name__ == 'Entity']
-            all_entities.extend(entities)
-            all_entity_names.extend([e.name.lower() for e in entities])
+        all_entities.extend(process.entities)
+        all_entity_names.extend([e.name.lower() for e in process.entities])
 
     context = {
         'group_name': 'com.bpml',  # Default group name
@@ -200,3 +180,5 @@ def get_context(model):
     }
 
     return context
+
+

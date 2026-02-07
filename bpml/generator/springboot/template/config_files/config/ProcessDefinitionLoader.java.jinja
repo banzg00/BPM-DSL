@@ -49,128 +49,92 @@ public class ProcessDefinitionLoader implements CommandLineRunner {
 
             // States
             List<Map<String, String>> states = new ArrayList<>();
-            {% for elem in process.elements %}
-            {% if elem.__class__.__name__ == 'State' %}
-            states.add(Map.of("name", "{{ elem.name }}", "type", "{{ elem.type if elem.type else 'ACTIVE' }}"));
-            {% endif %}
+            {% for state in process.states %}
+            states.add(Map.of("name", "{{ state.name }}", "type", "ACTIVE"));
             {% endfor %}
             definition.put("states", states);
 
             // Final states (states with no outgoing transitions)
             List<String> finalStates = new ArrayList<>();
             {% set all_from_states = [] %}
-            {% for elem in process.elements %}
-            {% if elem.__class__.__name__ == 'Transition' %}
-            {% set _ = all_from_states.append(elem.from_state.name) %}
-            {% endif %}
+            {% for transition in process.transitions %}
+            {% set _ = all_from_states.append(transition.from_state.name) %}
             {% endfor %}
-            {% for elem in process.elements %}
-            {% if elem.__class__.__name__ == 'State' %}
-            {% if elem.name not in all_from_states %}
-            finalStates.add("{{ elem.name }}");
-            {% endif %}
+            {% for state in process.states %}
+            {% if state.name not in all_from_states %}
+            finalStates.add("{{ state.name }}");
             {% endif %}
             {% endfor %}
             definition.put("finalStates", finalStates);
 
             // Roles
             List<Map<String, Object>> roles = new ArrayList<>();
-            {% for elem in process.elements %}
-            {% if elem.__class__.__name__ == 'Role' %}
-            {% set outer_index = loop.index %}
-            Map<String, Object> role{{ outer_index }} = new HashMap<>();
-            role{{ outer_index }}.put("name", "{{ elem.name }}");
-            {% if elem.supervised_roles %}
-            List<String> supervisedRoles{{ outer_index }} = new ArrayList<>();
-            {% for supervised in elem.supervised_roles %}
-            supervisedRoles{{ outer_index }}.add("{{ supervised.name }}");
-            {% endfor %}
-            role{{ outer_index }}.put("supervisedRoles", supervisedRoles{{ outer_index }});
-            {% endif %}
-            roles.add(role{{ outer_index }});
-            {% endif %}
+            {% for role in process.roles %}
+            {
+                Map<String, Object> role = new HashMap<>();
+                role.put("name", "{{ role.name }}");
+                {% if role.supervised_roles %}
+                role.put("supervisedRoles", List.of({% for supervised in role.supervised_roles %}"{{ supervised.name }}"{% if not loop.last %}, {% endif %}{% endfor %}));
+                {% endif %}
+                roles.add(role);
+            }
             {% endfor %}
             definition.put("roles", roles);
 
             // Role hierarchy (supervisor -> list of supervised roles)
             Map<String, List<String>> roleHierarchy = new HashMap<>();
-            {% for elem in process.elements %}
-            {% if elem.__class__.__name__ == 'Role' and elem.supervised_roles %}
-            {% set outer_index = loop.index %}
-            List<String> supervisedList{{ outer_index }} = new ArrayList<>();
-            {% for supervised_role in elem.supervised_roles %}
-            supervisedList{{ outer_index }}.add("{{ supervised_role.name }}");
-            {% endfor %}
-            roleHierarchy.put("{{ elem.name }}", supervisedList{{ outer_index }});
+            {% for role in process.roles %}
+            {% if role.supervised_roles %}
+            roleHierarchy.put("{{ role.name }}", List.of({% for supervised_role in role.supervised_roles %}"{{ supervised_role.name }}"{% if not loop.last %}, {% endif %}{% endfor %}));
             {% endif %}
             {% endfor %}
             definition.put("roleHierarchy", roleHierarchy);
 
             // Transitions
             List<Map<String, Object>> transitions = new ArrayList<>();
-            {% for elem in process.elements %}
-            {% if elem.__class__.__name__ == 'Transition' %}
-            Map<String, Object> transition{{ loop.index }} = new HashMap<>();
-            transition{{ loop.index }}.put("name", "{{ elem.name }}");
-            transition{{ loop.index }}.put("fromState", "{{ elem.from_state.name }}");
-            transition{{ loop.index }}.put("toState", "{{ elem.to_state.name }}");
-            {% if elem.role %}
-            transition{{ loop.index }}.put("role", "{{ elem.role.name }}");
-            {% endif %}
-            {% if elem.auto %}
-            transition{{ loop.index }}.put("auto", true);
-            {% endif %}
-            transitions.add(transition{{ loop.index }});
-            {% endif %}
+            {% for transition in process.transitions %}
+            {
+                Map<String, Object> t = new HashMap<>();
+                t.put("name", "{{ transition.name }}");
+                t.put("fromState", "{{ transition.from_state.name }}");
+                t.put("toState", "{{ transition.to_state.name }}");
+                {% if transition.role %}
+                t.put("role", "{{ transition.role.name }}");
+                {% endif %}
+                transitions.add(t);
+            }
             {% endfor %}
             definition.put("transitions", transitions);
 
             // Tasks
             List<Map<String, Object>> tasks = new ArrayList<>();
-            {% set task_counter = namespace(value=0) %}
-            {% for elem in process.elements %}
-            {% if elem.__class__.__name__ == 'Task' %}
-            {% set task_counter.value = task_counter.value + 1 %}
-            Map<String, Object> task{{ task_counter.value }} = new HashMap<>();
-            task{{ task_counter.value }}.put("name", "{{ elem.name }}");
-            task{{ task_counter.value }}.put("state", "{{ elem.state.name }}");
-            {% if elem.role %}
-            task{{ task_counter.value }}.put("role", "{{ elem.role.name }}");
-            {% endif %}
-            {% if elem.auto %}
-            task{{ task_counter.value }}.put("auto", true);
-            {% endif %}
-            {% if elem.entities %}
-            List<String> entities{{ task_counter.value }} = new ArrayList<>();
-            {% for entity in elem.entities %}
-            entities{{ task_counter.value }}.add("{{ entity.name }}");
-            {% endfor %}
-            task{{ task_counter.value }}.put("entities", entities{{ task_counter.value }});
-            {% endif %}
-            {% if elem.dependencies %}
-            List<String> dependencies{{ task_counter.value }} = new ArrayList<>();
-            {% for dep_task in elem.dependencies %}
-            dependencies{{ task_counter.value }}.add("{{ dep_task.name }}");
-            {% endfor %}
-            task{{ task_counter.value }}.put("dependencies", dependencies{{ task_counter.value }});
-            {% endif %}
-            tasks.add(task{{ task_counter.value }});
-            {% endif %}
+            {% for task in process.tasks %}
+            {
+                Map<String, Object> t = new HashMap<>();
+                t.put("name", "{{ task.name }}");
+                t.put("state", "{{ task.state.name }}");
+                {% if task.role %}
+                t.put("role", "{{ task.role.name }}");
+                {% endif %}
+                {% if task.auto %}
+                t.put("auto", true);
+                {% endif %}
+                {% if task.entities %}
+                t.put("entities", List.of({% for entity in task.entities %}"{{ entity.name }}"{% if not loop.last %}, {% endif %}{% endfor %}));
+                {% endif %}
+                {% if task.dependencies %}
+                t.put("dependencies", List.of({% for dep_task in task.dependencies %}"{{ dep_task.name }}"{% if not loop.last %}, {% endif %}{% endfor %}));
+                {% endif %}
+                tasks.add(t);
+            }
             {% endfor %}
             definition.put("tasks", tasks);
 
             // Convert to JSON
             String definitionJson = objectMapper.writeValueAsString(definition);
 
-            // Find initial state (first state or START state)
-            {% set initial_state_found = namespace(value=false, name='START') %}
-            {% for elem in process.elements %}
-            {% if elem.__class__.__name__ == 'State' and not initial_state_found.value %}
-            {% set initial_state_found.value = true %}
-            {% set initial_state_found.name = elem.name %}
-            {% endif %}
-            {% endfor %}
-            String initialState = "{{ initial_state_found.name }}";
+            // Find initial state (first state defined)
+            String initialState = "{{ process.states[0].name if process.states else 'START' }}";
 
             // Create and save process definition
             ProcessDefinition processDefinition = ProcessDefinition.builder()

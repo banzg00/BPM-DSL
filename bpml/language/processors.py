@@ -56,12 +56,10 @@ def _validate_process_structure(process):
     state_names = _validate_states(states, process.name)
 
     # Validate tasks
-    task_names = _validate_tasks(
-        tasks, state_names, role_names, entity_names, process.name
-    )
+    _validate_tasks(tasks, state_names, role_names, entity_names, process.name)
 
-    # Validate flow
-    _validate_flow(process.flow, task_names, process.name)
+    # Validate transitions
+    _validate_transitions(process.transitions, state_names, role_names, process.name)
 
 
 def _validate_entities(entities, process_name) -> set[str]:
@@ -172,41 +170,37 @@ def _validate_tasks(
     return task_names
 
 
-def _validate_flow(flow, valid_task_names, process_name):
-    """Validate flow definition"""
-    for task_ref in flow.tasks:
-        if task_ref.name not in valid_task_names:
+def _validate_transitions(transitions, state_names, role_names, process_name):
+    """Validate transition definitions"""
+    transition_names = set()
+    for transition in transitions:
+        if transition.name in transition_names:
             raise TextXSemanticError(
-                f"Flow references unknown task '{task_ref.name}' in process '{process_name}'"
+                f"Duplicate transition name '{transition.name}' in process '{process_name}'"
             )
 
+        if transition.from_state.name not in state_names:
+            raise TextXSemanticError(
+                f"Transition '{transition.name}' references unknown from_state "
+                f"'{transition.from_state.name}' in process '{process_name}'"
+            )
 
-# Utility functions for getting model information
+        if transition.to_state.name not in state_names:
+            raise TextXSemanticError(
+                f"Transition '{transition.name}' references unknown to_state "
+                f"'{transition.to_state.name}' in process '{process_name}'"
+            )
 
+        if transition.from_state.name == transition.to_state.name:
+            raise TextXSemanticError(
+                f"Transition '{transition.name}' has same from and to state "
+                f"'{transition.from_state.name}' in process '{process_name}'"
+            )
 
-def get_class_name(obj):
-    """Get the class name of an object"""
-    return obj.__class__.__name__
+        if transition.role.name not in role_names:
+            raise TextXSemanticError(
+                f"Transition '{transition.name}' references unknown role "
+                f"'{transition.role.name}' in process '{process_name}'"
+            )
 
-
-def get_all_process_names(model):
-    """Get all process names from the model"""
-    return (
-        [process.name for process in model.processes]
-        if hasattr(model, "processes")
-        else []
-    )
-
-
-def get_all_entity_names(process):
-    """Get all entity names from a process"""
-    return (
-        [entity.name for entity in process.entities]
-        if hasattr(process, "entities")
-        else []
-    )
-
-
-def get_all_role_names(process):
-    """Get all role names from a process"""
-    return [role.name for role in process.roles] if hasattr(process, "roles") else []
+        transition_names.add(transition.name)

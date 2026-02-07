@@ -116,9 +116,6 @@ process InvoiceApproval {
         from PaymentProcessingState
         to CompletedState
         by CFO
-
-    // Define the process flow
-    flow CreateInvoice, SubmitInvoice, ReviewByManager, ReviewByFinance, ApprovalByCFO, ProcessPayment, CloseInvoice
 }
 
 
@@ -212,7 +209,4 @@ process EmployeeOnboarding {
         from InTrainingState
         to ActiveState
         by Supervisor
-
-    // Workflow
-    flow SubmitDocuments, VerifyDocuments, RunBackgroundCheck, SetupWorkstation, AssignEquipment, ScheduleOrientation, ConductTraining, ActivateEmployee
 }
