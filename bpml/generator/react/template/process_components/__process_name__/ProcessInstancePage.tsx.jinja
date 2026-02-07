@@ -16,9 +16,10 @@ import {
 } from '@mui/material';
 import ProcessInstanceService from '../../../services/ProcessInstanceService';
 import TaskService from '../../../services/TaskService';
-import { ProcessInstance, ProcessStatus, TaskInstance, TaskStatus, AvailableTransition } from '../../../types/types';
+import { ProcessInstance, ProcessStatus, TaskInstance, TaskStatus, AvailableTransition, RoleHierarchy } from '../../../types/types';
 import ProcessTimeline from '../../shared/ProcessTimeline';
 import StateTransitionDialog from '../../shared/StateTransitionDialog';
+import EscalateTaskDialog from '../../shared/EscalateTaskDialog';
 
 const ProcessInstancePage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -33,12 +34,24 @@ const ProcessInstancePage: React.FC = () => {
   const [suspendReason, setSuspendReason] = useState('');
   const [terminateReason, setTerminateReason] = useState('');
   const [historyRefreshKey, setHistoryRefreshKey] = useState(0);
+  const [escalateDialogOpen, setEscalateDialogOpen] = useState(false);
+  const [selectedTask, setSelectedTask] = useState<TaskInstance | null>(null);
+  const [roleHierarchy, setRoleHierarchy] = useState<RoleHierarchy>({});
 
   useEffect(() => {
     if (id) {
       loadData();
+      loadRoleHierarchy();
     }
   }, [id]);
+
+  const loadRoleHierarchy = () => {
+    ProcessInstanceService.getRoleHierarchy('{{ process_name }}').then((hierarchy) => {
+      setRoleHierarchy(hierarchy);
+    }).catch((err) => {
+      console.error('Failed to load role hierarchy:', err);
+    });
+  };
 
   const loadData = () => {
     const instanceId = parseInt(id!);
@@ -69,6 +82,53 @@ const ProcessInstancePage: React.FC = () => {
 
   const handleBack = () => {
     navigate('/process/{{ process_name_lower }}/instances');
+  };
+
+  const handleClaimTask = (taskId: number, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const userId = prompt('Enter your user ID:');
+    if (userId) {
+      TaskService.claimTask(taskId, userId).then(() => {
+        loadData();
+        setHistoryRefreshKey(prev => prev + 1);
+      }).catch(error => {
+        console.error('Failed to claim task:', error);
+        alert('Failed to claim task: ' + error.message);
+      });
+    }
+  };
+
+  const handleCompleteTask = (taskId: number, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const userId = prompt('Enter your user ID:');
+    if (userId) {
+      TaskService.completeTask(taskId, userId).then(() => {
+        loadData();
+        setHistoryRefreshKey(prev => prev + 1);
+      }).catch(error => {
+        console.error('Failed to complete task:', error);
+        alert('Failed to complete task: ' + error.message);
+      });
+    }
+  };
+
+  const handleEscalateClick = (task: TaskInstance, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setSelectedTask(task);
+    setEscalateDialogOpen(true);
+  };
+
+  const handleEscalate = async (taskId: number, targetRole: string, reason: string) => {
+    const userId = prompt('Enter your user ID:');
+    if (userId) {
+      await TaskService.escalateTask(taskId, {
+        userId,
+        targetRole,
+        reason
+      });
+      loadData();
+      setHistoryRefreshKey(prev => prev + 1);
+    }
   };
 
   const handleSuspend = () => {
@@ -390,47 +450,81 @@ const ProcessInstancePage: React.FC = () => {
                       bgcolor: task.isEscalated ? 'warning.light' : 'inherit'
                     {{ "}}" }}
                   >
-                    <Typography variant="body1">
-                      {task.taskName}
-                      {task.isEscalated && (
-                        <Chip
-                          label="Escalated"
-                          size="small"
-                          color="warning"
-                          sx={{ "{{" }} ml: 1 {{ "}}" }}
-                        />
-                      )}
-                    </Typography>
-                    <Box display="flex" gap={2} mt={1}>
-                      <Chip label={task.status.replace("_", " ")} color={getTaskStatusColor(task.status)} size="small" />
-                      <Typography variant="caption" color="text.secondary">
-                        Role: {task.assignedRole}
-                      </Typography>
-                      {task.assignedUser && (
-                        <Typography variant="caption" color="text.secondary">
-                          Assigned to: {task.assignedUser}
+                    <Box display="flex" justifyContent="space-between" alignItems="flex-start">
+                      <Box flex={1}>
+                        <Typography variant="body1">
+                          {task.taskName}
+                          {task.isEscalated && (
+                            <Chip
+                              label="Escalated"
+                              size="small"
+                              color="warning"
+                              sx={{ "{{" }} ml: 1 {{ "}}" }}
+                            />
+                          )}
                         </Typography>
-                      )}
-                    </Box>
-                    {task.isEscalated && (
-                      <Box mt={1} p={1} bgcolor="warning.lighter" borderRadius={1}>
-                        <Typography variant="caption" display="block" color="text.secondary">
-                          <strong>Escalation Info:</strong>
-                        </Typography>
-                        <Typography variant="caption" display="block">
-                          From: {task.originalAssignedRole} -&gt; To: {task.escalatedToRole}
-                        </Typography>
-                        <Typography variant="caption" display="block">
-                          By: {task.escalatedBy}
-                        </Typography>
-                        <Typography variant="caption" display="block">
-                          Reason: {task.escalationReason}
-                        </Typography>
-                        <Typography variant="caption" display="block" color="text.secondary">
-                          {task.escalatedAt && new Date(task.escalatedAt).toLocaleString()}
-                        </Typography>
+                        <Box display="flex" gap={2} mt={1}>
+                          <Chip label={task.status.replace("_", " ")} color={getTaskStatusColor(task.status)} size="small" />
+                          <Typography variant="caption" color="text.secondary">
+                            Role: {task.assignedRole}
+                          </Typography>
+                          {task.assignedUser && (
+                            <Typography variant="caption" color="text.secondary">
+                              Assigned to: {task.assignedUser}
+                            </Typography>
+                          )}
+                        </Box>
+                        {task.isEscalated && (
+                          <Box mt={1} p={1} bgcolor="warning.lighter" borderRadius={1}>
+                            <Typography variant="caption" display="block" color="text.secondary">
+                              <strong>Escalation Info:</strong>
+                            </Typography>
+                            <Typography variant="caption" display="block">
+                              From: {task.originalAssignedRole} -&gt; To: {task.escalatedToRole}
+                            </Typography>
+                            <Typography variant="caption" display="block">
+                              By: {task.escalatedBy}
+                            </Typography>
+                            <Typography variant="caption" display="block">
+                              Reason: {task.escalationReason}
+                            </Typography>
+                            <Typography variant="caption" display="block" color="text.secondary">
+                              {task.escalatedAt && new Date(task.escalatedAt).toLocaleString()}
+                            </Typography>
+                          </Box>
+                        )}
                       </Box>
-                    )}
+                      <Box display="flex" gap={1} ml={2}>
+                        {task.status === TaskStatus.PENDING && task.assignedRole !== 'SYSTEM' && (
+                          <Button
+                            size="small"
+                            variant="outlined"
+                            onClick={(e) => handleClaimTask(task.id, e)}
+                          >
+                            Claim
+                          </Button>
+                        )}
+                        {task.status === TaskStatus.IN_PROGRESS && (
+                          <>
+                            <Button
+                              size="small"
+                              variant="contained"
+                              onClick={(e) => handleCompleteTask(task.id, e)}
+                            >
+                              Complete
+                            </Button>
+                            <Button
+                              size="small"
+                              variant="outlined"
+                              color="warning"
+                              onClick={(e) => handleEscalateClick(task, e)}
+                            >
+                              Escalate
+                            </Button>
+                          </>
+                        )}
+                      </Box>
+                    </Box>
                   </Box>
                 ))}
               </Box>
@@ -503,6 +597,17 @@ const ProcessInstancePage: React.FC = () => {
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* Escalate Task Dialog */}
+      <EscalateTaskDialog
+        open={escalateDialogOpen}
+        task={selectedTask}
+        processName="{{ process_name }}"
+        currentUserId="current-user"
+        onClose={() => setEscalateDialogOpen(false)}
+        onEscalate={handleEscalate}
+        roleHierarchy={roleHierarchy}
+      />
     </Container>
   );
 };
