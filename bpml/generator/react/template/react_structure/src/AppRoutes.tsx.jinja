@@ -13,6 +13,7 @@ import {{ process.name }}Dashboard from './components/processes/{{ process.name 
 import {{ process.name }}ProcessInstanceList from './components/processes/{{ process.name }}/ProcessInstanceList';
 import {{ process.name }}ProcessInstancePage from './components/processes/{{ process.name }}/ProcessInstancePage';
 import {{ process.name }}TaskList from './components/processes/{{ process.name }}/TaskList';
+import {{ process.name }}ProcessGraph from './components/processes/{{ process.name }}/ProcessGraph';
 {% endfor %}
 
 const AppRoutes: React.FC = () => {
@@ -34,6 +35,7 @@ const AppRoutes: React.FC = () => {
         <Route path="/process/{{ process.name | lower }}/instances" element={<{{ process.name }}ProcessInstanceList />} />
         <Route path="/process/{{ process.name | lower }}/instances/:id" element={<{{ process.name }}ProcessInstancePage />} />
         <Route path="/process/{{ process.name | lower }}/tasks" element={<{{ process.name }}TaskList />} />
+        <Route path="/process/{{ process.name | lower }}/graph" element={<{{ process.name }}ProcessGraph />} />
         {% endfor %}
 
         <Route path="*" element={<Navigate to="/" replace />} />

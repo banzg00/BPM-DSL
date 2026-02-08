@@ -10,6 +10,7 @@ import {
   Box,
   Dialog
 } from '@mui/material';
+import AccountTreeIcon from '@mui/icons-material/AccountTree';
 import ProcessInstanceService from '../../../services/ProcessInstanceService';
 import { ProcessInstance, ProcessStatus } from '../../../types/types';
 import StartProcessDialog from '../../shared/StartProcessDialog';
@@ -128,6 +129,13 @@ const {{ process_name }}Dashboard: React.FC = () => {
                   onClick={() => navigate('/process/{{ process_name_lower }}/tasks')}
                 >
                   View My Tasks
+                </Button>
+                <Button
+                  variant="outlined"
+                  onClick={() => navigate('/process/{{ process_name_lower }}/graph')}
+                  startIcon={<AccountTreeIcon />}
+                >
+                  View Process Graph
                 </Button>
               </Box>
             </CardContent>

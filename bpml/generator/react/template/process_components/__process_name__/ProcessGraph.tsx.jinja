@@ -1,0 +1,430 @@
+import React, { useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
+import {
+  ReactFlow,
+  Background,
+  Controls,
+  MiniMap,
+  type Node,
+  type Edge,
+  Position,
+} from '@xyflow/react';
+import '@xyflow/react/dist/style.css';
+import dagre from '@dagrejs/dagre';
+import { Box, Button, Typography, Chip } from '@mui/material';
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+
+// --- Static process data generated from BPML definition ---
+
+interface StateDefinition {
+  id: string;
+  label: string;
+}
+
+interface TaskDefinition {
+  id: string;
+  label: string;
+  stateId: string;
+  isAuto: boolean;
+  role: string;
+  dependencies: string[];
+}
+
+interface TransitionDefinition {
+  id: string;
+  label: string;
+  from: string;
+  to: string;
+  role: string;
+}
+
+const stateDefinitions: StateDefinition[] = [
+  {% for state in process_states %}
+  { id: '{{ state.name }}', label: '{{ state.name }}' },
+  {% endfor %}
+];
+
+const taskDefinitions: TaskDefinition[] = [
+  {% for task in process_tasks %}
+  {
+    id: '{{ task.name }}',
+    label: '{{ task.name }}',
+    stateId: '{{ task.state.name }}',
+    isAuto: {{ 'true' if task.auto else 'false' }},
+    role: '{{ task.role.name if task.role else "auto" }}',
+    dependencies: [{% for dep in task.dependencies %}'{{ dep.name }}'{% if not loop.last %}, {% endif %}{% endfor %}],
+  },
+  {% endfor %}
+];
+
+const transitionDefinitions: TransitionDefinition[] = [
+  {% for transition in process_transitions %}
+  {
+    id: '{{ transition.name }}',
+    label: '{{ transition.name }}',
+    from: '{{ transition.from_state.name }}',
+    to: '{{ transition.to_state.name }}',
+    role: '{{ transition.role.name }}',
+  },
+  {% endfor %}
+];
+
+// --- Layout constants ---
+
+const TASK_NODE_WIDTH = 200;
+const TASK_NODE_HEIGHT = 40;
+const TASK_GAP_X = 40;
+const TASK_GAP_Y = 16;
+const STATE_PADDING_X = 16;
+const STATE_PADDING_TOP = 40;
+const STATE_PADDING_BOTTOM = 16;
+const STATE_MIN_WIDTH = 160;
+const STATE_MIN_HEIGHT = 60;
+
+// --- Determine initial and final states ---
+
+const statesWithOutgoing = new Set(transitionDefinitions.map((t) => t.from));
+const initialStateId = stateDefinitions.length > 0 ? stateDefinitions[0].id : '';
+const finalStateIds = new Set(
+  stateDefinitions.filter((s) => !statesWithOutgoing.has(s.id)).map((s) => s.id)
+);
+
+function getStateBackground(stateId: string): string {
+  if (stateId === initialStateId) return '#e8f5e9';
+  if (finalStateIds.has(stateId)) return '#f5f5f5';
+  return '#e3f2fd';
+}
+
+function getStateBorderColor(stateId: string): string {
+  if (stateId === initialStateId) return '#4caf50';
+  if (finalStateIds.has(stateId)) return '#9e9e9e';
+  return '#1976d2';
+}
+
+// --- Compute columnar task layout within a state based on intra-state dependencies ---
+
+interface TaskLayout {
+  positions: Map<string, { col: number; row: number }>;
+  numCols: number;
+  maxRows: number;
+}
+
+function layoutTasksInState(tasks: TaskDefinition[]): TaskLayout {
+  if (tasks.length === 0) return { positions: new Map(), numCols: 0, maxRows: 0 };
+
+  const taskIds = new Set(tasks.map((t) => t.id));
+
+  // Only consider dependencies within this state
+  const intraStateDeps: Record<string, string[]> = {{ "{}" }};
+  for (const t of tasks) {
+    intraStateDeps[t.id] = t.dependencies.filter((d) => taskIds.has(d));
+  }
+
+  // Assign columns by dependency depth
+  const col: Record<string, number> = {{ "{}" }};
+  function getCol(id: string): number {
+    if (col[id] !== undefined) return col[id];
+    const deps = intraStateDeps[id] || [];
+    if (deps.length === 0) {
+      col[id] = 0;
+      return 0;
+    }
+    col[id] = Math.max(...deps.map(getCol)) + 1;
+    return col[id];
+  }
+  for (const t of tasks) getCol(t.id);
+
+  // Group by column
+  const columns: Record<number, string[]> = {{ "{}" }};
+  let numCols = 0;
+  for (const t of tasks) {
+    const c = col[t.id];
+    if (!columns[c]) columns[c] = [];
+    columns[c].push(t.id);
+    numCols = Math.max(numCols, c + 1);
+  }
+
+  let maxRows = 0;
+  const positions = new Map<string, { col: number; row: number }>();
+  for (let c = 0; c < numCols; c++) {
+    const ids = columns[c] || [];
+    maxRows = Math.max(maxRows, ids.length);
+    ids.forEach((id, row) => positions.set(id, { col: c, row }));
+  }
+
+  return { positions, numCols: numCols || 1, maxRows: maxRows || 1 };
+}
+
+function getStateDimensions(layout: TaskLayout): { width: number; height: number } {
+  if (layout.numCols === 0) return { width: STATE_MIN_WIDTH, height: STATE_MIN_HEIGHT };
+  const width = Math.max(
+    STATE_MIN_WIDTH,
+    STATE_PADDING_X * 2 + layout.numCols * TASK_NODE_WIDTH + (layout.numCols - 1) * TASK_GAP_X
+  );
+  const height = Math.max(
+    STATE_MIN_HEIGHT,
+    STATE_PADDING_TOP + layout.maxRows * TASK_NODE_HEIGHT + (layout.maxRows - 1) * TASK_GAP_Y + STATE_PADDING_BOTTOM
+  );
+  return { width, height };
+}
+
+// --- Build ReactFlow nodes and edges with dagre layout ---
+
+function buildGraph(): { nodes: Node[]; edges: Edge[] } {
+  // Build a lookup: taskId -> stateId
+  const taskStateMap: Record<string, string> = {{ "{}" }};
+  for (const task of taskDefinitions) {
+    taskStateMap[task.id] = task.stateId;
+  }
+
+  // Group tasks by state and compute inner layouts
+  const tasksByState: Record<string, TaskDefinition[]> = {{ "{}" }};
+  for (const task of taskDefinitions) {
+    if (!tasksByState[task.stateId]) tasksByState[task.stateId] = [];
+    tasksByState[task.stateId].push(task);
+  }
+
+  const stateLayouts: Record<string, TaskLayout> = {{ "{}" }};
+  const stateDims: Record<string, { width: number; height: number }> = {{ "{}" }};
+  for (const state of stateDefinitions) {
+    const layout = layoutTasksInState(tasksByState[state.id] || []);
+    stateLayouts[state.id] = layout;
+    stateDims[state.id] = getStateDimensions(layout);
+  }
+
+  // Dagre layout for state-level positioning (horizontal)
+  const g = new dagre.graphlib.Graph();
+  g.setGraph({ rankdir: 'LR', ranksep: 120, nodesep: 80 });
+  g.setDefaultEdgeLabel(() => ({{ "{}" }}));
+
+  for (const state of stateDefinitions) {
+    const dim = stateDims[state.id];
+    g.setNode(state.id, { width: dim.width, height: dim.height });
+  }
+
+  for (const transition of transitionDefinitions) {
+    g.setEdge(transition.from, transition.to);
+  }
+
+  dagre.layout(g);
+
+  const nodes: Node[] = [];
+  const edges: Edge[] = [];
+
+  // Create state group nodes + label nodes + task child nodes
+  for (const state of stateDefinitions) {
+    const nodeData = g.node(state.id);
+    const dim = stateDims[state.id];
+    const layout = stateLayouts[state.id];
+
+    // State container 'default' type with empty label so it has handles for edges
+    nodes.push({
+      id: state.id,
+      position: { x: nodeData.x - dim.width / 2, y: nodeData.y - dim.height / 2 },
+      sourcePosition: Position.Right,
+      targetPosition: Position.Left,
+      style: {
+        width: dim.width,
+        height: dim.height,
+        backgroundColor: getStateBackground(state.id),
+        borderRadius: 8,
+        border: `2px solid ${getStateBorderColor(state.id)}`,
+        padding: 0,
+      },
+      data: { label: '' },
+    });
+
+    // State label (visual only, not used for edges)
+    nodes.push({
+      id: `${state.id}-label`,
+      position: { x: 0, y: 4 },
+      parentId: state.id,
+      extent: 'parent' as const,
+      draggable: false,
+      selectable: false,
+      connectable: false,
+      style: {
+        width: dim.width,
+        height: 28,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: 'transparent',
+        border: 'none',
+        boxShadow: 'none',
+        fontWeight: 'bold',
+        fontSize: 13,
+        pointerEvents: 'none' as const,
+      },
+      data: { label: state.label },
+    });
+
+    // Task nodes inside the state
+    const tasks = tasksByState[state.id] || [];
+    for (const task of tasks) {
+      const pos = layout.positions.get(task.id);
+      if (!pos) continue;
+      nodes.push({
+        id: task.id,
+        position: {
+          x: STATE_PADDING_X + pos.col * (TASK_NODE_WIDTH + TASK_GAP_X),
+          y: STATE_PADDING_TOP + pos.row * (TASK_NODE_HEIGHT + TASK_GAP_Y),
+        },
+        parentId: state.id,
+        extent: 'parent' as const,
+        sourcePosition: Position.Right,
+        targetPosition: Position.Left,
+        style: {
+          width: TASK_NODE_WIDTH,
+          height: TASK_NODE_HEIGHT,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          borderRadius: 6,
+          fontSize: 11,
+          backgroundColor: task.isAuto ? '#fff3e0' : '#ffffff',
+          border: task.isAuto ? '2px dashed #ff9800' : '1px solid #90caf9',
+          boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+        },
+        data: {
+          label: `${task.label}${task.role !== 'auto' ? ` (${task.role})` : ' [auto]'}`,
+        },
+      });
+    }
+  }
+
+  // Transition edges: state-to-state (default bezier)
+  for (const transition of transitionDefinitions) {
+    edges.push({
+      id: `transition-${transition.id}`,
+      source: transition.from,
+      target: transition.to,
+      markerEnd: { type: 'arrowclosed' as const },
+    });
+  }
+
+  // Dependency edges: only intra-state task-to-task (dashed black, no label)
+  for (const task of taskDefinitions) {
+    for (const depId of task.dependencies) {
+      // Only draw if both tasks are in the same state
+      if (taskStateMap[depId] !== task.stateId) continue;
+      edges.push({
+        id: `dep-${depId}-${task.id}`,
+        source: depId,
+        target: task.id,
+        type: 'smoothstep',
+        animated: true,
+        style: { stroke: '#333333', strokeWidth: 1.5, strokeDasharray: '5 3' },
+        markerEnd: { type: 'arrowclosed' as const, color: '#333333' },
+      });
+    }
+  }
+
+  return { nodes, edges };
+}
+
+const {{ process_name }}ProcessGraph: React.FC = () => {
+  const navigate = useNavigate();
+  const { nodes, edges } = useMemo(() => buildGraph(), []);
+
+  return (
+    <Box sx={{ "{{" }} display: 'flex', flexDirection: 'column', height: '100vh' {{ "}}" }}>
+      {/* Hide handles and style state label at top */}
+      <style>{`
+        .react-flow__handle { opacity: 0 !important; width: 1px !important; height: 1px !important; min-width: 0 !important; min-height: 0 !important; }
+        .react-flow__node-default .react-flow__node-toolbar-wrapper + div,
+        .react-flow__node-default > .react-flow__node-label { pointer-events: none; }
+      `}</style>
+
+      {/* Header */}
+      <Box
+        sx={{ "{{" }}
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          px: 3,
+          py: 1.5,
+          borderBottom: '1px solid #e0e0e0',
+        {{ "}}" }}
+      >
+        <Typography variant="h5" component="h1">
+          {{ process_name }} - Process Graph
+        </Typography>
+        <Button
+          variant="outlined"
+          startIcon={<ArrowBackIcon />}
+          onClick={() => navigate('/process/{{ process_name_lower }}')}
+        >
+          Back to Dashboard
+        </Button>
+      </Box>
+
+      {/* ReactFlow Canvas */}
+      <Box sx={{ "{{" }} flex: 1, minHeight: '70vh' {{ "}}" }}>
+        <ReactFlow
+          nodes={nodes}
+          edges={edges}
+          fitView
+          fitViewOptions={{ "{{" }} padding: 0.2 {{ "}}" }}
+          minZoom={0.1}
+          maxZoom={2}
+        >
+          <Background />
+          <Controls />
+        </ReactFlow>
+      </Box>
+
+      {/* Legend */}
+      <Box
+        sx={{ "{{" }}
+          display: 'flex',
+          gap: 3,
+          px: 3,
+          py: 1.5,
+          borderTop: '1px solid #e0e0e0',
+          flexWrap: 'wrap',
+          alignItems: 'center',
+        {{ "}}" }}
+      >
+        <Typography variant="body2" fontWeight="bold">
+          Legend:
+        </Typography>
+        <Chip
+          size="small"
+          label="Initial State"
+          sx={{ "{{" }} backgroundColor: '#e8f5e9', border: '2px solid #4caf50' {{ "}}" }}
+        />
+        <Chip
+          size="small"
+          label="State"
+          sx={{ "{{" }} backgroundColor: '#e3f2fd', border: '2px solid #1976d2' {{ "}}" }}
+        />
+        <Chip
+          size="small"
+          label="Final State"
+          sx={{ "{{" }} backgroundColor: '#f5f5f5', border: '2px solid #9e9e9e' {{ "}}" }}
+        />
+        <Chip
+          size="small"
+          label="Manual Task"
+          sx={{ "{{" }} backgroundColor: '#ffffff', border: '1px solid #90caf9' {{ "}}" }}
+        />
+        <Chip
+          size="small"
+          label="Auto Task"
+          sx={{ "{{" }} backgroundColor: '#fff3e0', border: '2px dashed #ff9800' {{ "}}" }}
+        />
+        <Box sx={{ "{{" }} display: 'flex', alignItems: 'center', gap: 0.5 {{ "}}" }}>
+          <Box sx={{ "{{" }} width: 24, height: 2, backgroundColor: '#333' {{ "}}" }} />
+          <Typography variant="caption">Transition</Typography>
+        </Box>
+        <Box sx={{ "{{" }} display: 'flex', alignItems: 'center', gap: 0.5 {{ "}}" }}>
+          <Box sx={{ "{{" }} width: 24, height: 0, borderTop: '2px dashed #333333' {{ "}}" }} />
+          <Typography variant="caption">Dependency</Typography>
+        </Box>
+      </Box>
+    </Box>
+  );
+};
+
+export default {{ process_name }}ProcessGraph;
