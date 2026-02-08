@@ -18,11 +18,12 @@ BPM-DSL is a complete Domain-Specific Language (DSL) that enables developers to 
 - 📝 **Declarative Process Modeling** - Define entities, roles, states, transitions, and workflows
 - 🏭 **Full-Stack Code Generation** - Generate complete Spring Boot + React applications
 - 🔄 **Process Runtime Engine** - Built-in process execution with state management
-- 👥 **Role-Based Access Control** - Define roles and control who can perform actions
+- 👥 **Role-Based Access Control** - Define roles with hierarchy and control who can perform actions
 - 📊 **Entity Management** - CRUD operations for all defined entities
-- ✅ **Task Management** - Workflow task assignment and completion tracking
+- ✅ **Task Management** - Workflow task assignment, dependencies, and completion tracking
 - 🔍 **Process Tracking** - Monitor running process instances and their states
 - 🎯 **Type Safety** - Strong typing with enums and validation
+- 📈 **Process Graph Visualization** - Interactive graph view of states, transitions, and task dependencies
 
 ## Quick Start
 
@@ -94,14 +95,16 @@ entity Invoice {
 
 #### 2. Roles (Process Participants)
 
-Define who can participate in the process:
+Define who can participate in the process, with optional supervision hierarchy:
 
 ```bpml
 role Employee
-role Manager
+role Manager supervises Employee
 role FinanceTeam
-role CFO
+role CFO supervises Manager, FinanceTeam
 ```
+
+- `supervises` - Defines role hierarchy (optional)
 
 #### 3. States (Process Lifecycle)
 
@@ -116,19 +119,21 @@ state RejectedState
 state CompletedState
 ```
 
-#### 4. Steps (Workflow Tasks)
+#### 4. Tasks (Workflow Items)
 
-Define work items that need to be performed:
+Define work items assigned to states, with optional dependencies:
 
 ```bpml
-step CreateInvoice by Employee affects Invoice
-step ReviewByManager by Manager affects Invoice
-step ApprovalByCFO by CFO affects Invoice
-step ProcessPayment by AccountsPayable affects PaymentInfo
+task InitTask in DraftState by Employee
+task CreateInvoice in DraftState by Employee affects Invoice
+task SubmitInvoice in DraftState auto affects Invoice depends_on InitTask, CreateInvoice
+task ReviewByManager in ManagerReviewState by Manager affects Invoice, ApprovalRecord
 ```
 
-- `by` - Specifies which role performs this step
-- `affects` - Specifies which entity is modified by this step
+- `in` - Assigns the task to a specific state
+- `by` / `auto` - Specifies which role performs this task, or marks it as automatic
+- `affects` - Specifies which entities are modified by this task (optional)
+- `depends_on` - Declares dependencies on other tasks (optional). Tasks with no mutual dependencies in the same state run in parallel (fork). A task that `depends_on` multiple tasks creates a join — all dependencies must complete first.
 
 #### 5. Transitions (State Changes)
 
@@ -144,14 +149,6 @@ transition RejectInvoiceTransition
     from ManagerReviewState
     to RejectedState
     by Manager
-```
-
-#### 6. Flow (Execution Sequence)
-
-Define the order in which steps should be executed:
-
-```bpml
-flow CreateInvoice, SubmitInvoice, ReviewByManager, ReviewByFinance, ApprovalByCFO, ProcessPayment, CloseInvoice
 ```
 
 ### Complete Example
@@ -237,7 +234,8 @@ generated_react/
         │       ├── [Process]Dashboard.tsx    # Process overview
         │       ├── ProcessInstanceList.tsx   # Running instances
         │       ├── ProcessInstancePage.tsx   # Instance details
-        │       └── TaskList.tsx              # Workflow tasks
+        │       ├── TaskList.tsx              # Workflow tasks
+        │       └── ProcessGraph.tsx          # Interactive process graph
         └── shared/
             ├── ProcessTimeline.tsx           # Visual state display
             ├── StartProcessDialog.tsx        # Start new process
@@ -250,6 +248,7 @@ generated_react/
 - ✅ Process dashboard with instance monitoring
 - ✅ Task list with claim/complete actions
 - ✅ Visual process timeline
+- ✅ Interactive process graph with state containers, task nodes, transitions, and dependency edges (ReactFlow + dagre)
 - ✅ TypeScript type safety
 - ✅ Vite for fast development
 
@@ -350,6 +349,7 @@ BPM-DSL/
 | **Frontend Framework** | React 18 + TypeScript |
 | **Build Tool (Frontend)** | Vite |
 | **UI Components** | Material-UI (MUI) |
+| **Process Graph** | ReactFlow, dagre (auto-layout) |
 | **Build Tool (Backend)** | Maven |
 
 ## Requirements
@@ -368,10 +368,10 @@ The BPML language includes comprehensive validation:
 - ✅ No duplicate process names
 - ✅ No duplicate entity names within a process
 - ✅ No duplicate role names within a process
-- ✅ No duplicate step names within a process
-- ✅ Steps must reference existing roles
-- ✅ Steps must reference existing entities
-- ✅ Flow must reference valid steps
+- ✅ No duplicate task names within a process
+- ✅ Tasks must reference existing roles or be marked `auto`
+- ✅ Tasks must reference existing entities and states
+- ✅ Task dependencies must reference existing tasks
 - ✅ Transitions must reference valid states and roles
 
 Validation errors are caught at parse time before code generation.
@@ -404,6 +404,17 @@ Tasks can be assigned to:
 - **Roles** - Any user with that role can claim the task
 - **Specific users** - Direct assignment
 
+### Process Graph Visualization
+
+Each generated process includes an interactive graph view accessible from the process dashboard via the "View Process Graph" button. The graph is statically generated at code-generation time (no backend API needed) and displays:
+
+- **State containers** — Colored boxes representing process states (green for initial, blue for intermediate, gray for final)
+- **Task nodes** — Inside each state, showing role assignments. Manual tasks have a solid border; automatic tasks have a dashed orange border
+- **State transitions** — Bezier edges connecting states, representing the allowed state changes
+- **Task dependencies** — Dashed animated edges within a state, showing fork-join semantics. Independent tasks appear in parallel columns; dependent tasks appear to the right
+
+The layout is computed automatically using dagre (left-to-right flow). State containers are draggable for manual arrangement. Built with [ReactFlow](https://reactflow.dev/) and [@dagrejs/dagre](https://github.com/dagrejs/dagre).
+
 ### Process Suspension
 
 Process instances can be suspended (paused) and later resumed, useful for:
@@ -418,24 +429,24 @@ The project includes two complete example processes in [bpml/examples/example.bp
 ### 1. Invoice Approval System
 A multi-level approval workflow with:
 - 3 entities (Invoice, ApprovalRecord, PaymentInfo)
-- 5 roles (Employee, Manager, FinanceTeam, CFO, AccountsPayable)
+- 4 roles with hierarchy (Employee, Manager, FinanceTeam, CFO)
 - 9 states (Draft → Completed)
-- 11 workflow steps
-- Complex approval flow with rejection paths
+- 13 tasks with dependencies and auto tasks
+- Branching at 3 points (Manager, Finance, CFO can approve or reject)
 
 ### 2. Employee Onboarding
 A comprehensive onboarding process with:
 - 3 entities (Employee, Equipment, TrainingRecord)
-- 5 roles (HR, ITSupport, Supervisor, Trainer, NewEmployee)
+- 5 roles with hierarchy (NewEmployee, HR, ITSupport, Trainer, Supervisor)
 - 8 states (New → Active)
-- Background checks, equipment setup, and training
+- 8 tasks with cross-state dependency chain
+- Linear flow with equipment setup and training
 
 ## Contributing
 
 Contributions are welcome! Areas for improvement:
 - Additional code generators (Angular, Vue, NestJS, etc.)
 - Enhanced validation rules
-- Process visualization tools
 - Testing framework integration
 - Process analytics and reporting
 
