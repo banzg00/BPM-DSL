@@ -1,0 +1,136 @@
+{
+  "Project Definition": {
+    "prefix": "project",
+    "body": [
+      "project {",
+      "\tname: ${1:ProjectName}",
+      "\tdescription: \"${2:Project description}\"",
+      "\tversion: \"${3:1.0.0}\"",
+      "\tauthor: \"${4:Author}\"",
+      "}"
+    ],
+    "description": "Create a project definition"
+  },
+  "Process Definition": {
+    "prefix": "process",
+    "body": [
+      "process ${1:ProcessName} {",
+      "\t$0",
+      "}"
+    ],
+    "description": "Create a process definition"
+  },
+  "Entity Definition": {
+    "prefix": "entity",
+    "body": [
+      "entity ${1:EntityName} {",
+      "\t${2:fieldName}: ${3|string,int,float,boolean|}",
+      "}"
+    ],
+    "description": "Create an entity definition"
+  },
+  "Entity with Enum": {
+    "prefix": "entity-enum",
+    "body": [
+      "entity ${1:EntityName} {",
+      "\t${2:fieldName}: ${3:string}",
+      "\t${4:status}: enum { ${5:VALUE1}, ${6:VALUE2} }",
+      "}"
+    ],
+    "description": "Create an entity with an enum field"
+  },
+  "Role Definition": {
+    "prefix": "role",
+    "body": [
+      "role ${1:RoleName}"
+    ],
+    "description": "Create a role definition"
+  },
+  "Role with Supervision": {
+    "prefix": "role-supervises",
+    "body": [
+      "role ${1:RoleName} supervises ${2:SubordinateRole}"
+    ],
+    "description": "Create a role with supervision"
+  },
+  "State Definition": {
+    "prefix": "state",
+    "body": [
+      "state ${1:StateName}"
+    ],
+    "description": "Create a state definition"
+  },
+  "Task Definition": {
+    "prefix": "task",
+    "body": [
+      "task ${1:TaskName} in ${2:State} by ${3:Role}"
+    ],
+    "description": "Create a task definition"
+  },
+  "Task with Effects": {
+    "prefix": "task-affects",
+    "body": [
+      "task ${1:TaskName} in ${2:State} by ${3:Role} affects ${4:Entity}"
+    ],
+    "description": "Create a task that affects entities"
+  },
+  "Task with Dependencies": {
+    "prefix": "task-depends",
+    "body": [
+      "task ${1:TaskName} in ${2:State} by ${3:Role} depends_on ${4:PreviousTask}"
+    ],
+    "description": "Create a task with dependencies"
+  },
+  "Auto Task": {
+    "prefix": "task-auto",
+    "body": [
+      "task ${1:TaskName} in ${2:State} auto"
+    ],
+    "description": "Create an automatic task"
+  },
+  "Transition Definition": {
+    "prefix": "transition",
+    "body": [
+      "transition ${1:TransitionName}",
+      "\tfrom ${2:FromState}",
+      "\tto ${3:ToState}",
+      "\tby ${4:Role}"
+    ],
+    "description": "Create a transition definition"
+  },
+  "Complete BPML Template": {
+    "prefix": "bpml-template",
+    "body": [
+      "project {",
+      "\tname: ${1:ProjectName}",
+      "\tdescription: \"${2:Project description}\"",
+      "\tversion: \"1.0.0\"",
+      "\tauthor: \"${3:Author}\"",
+      "}",
+      "",
+      "process ${4:ProcessName} {",
+      "\t// Entities",
+      "\tentity ${5:EntityName} {",
+      "\t\t${6:fieldName}: ${7:string}",
+      "\t}",
+      "",
+      "\t// Roles",
+      "\trole ${8:RoleName}",
+      "",
+      "\t// States",
+      "\tstate ${9:InitialState}",
+      "\tstate ${10:FinalState}",
+      "",
+      "\t// Tasks",
+      "\ttask ${11:TaskName} in ${9:InitialState} by ${8:RoleName}",
+      "",
+      "\t// Transitions",
+      "\ttransition ${12:TransitionName}",
+      "\t\tfrom ${9:InitialState}",
+      "\t\tto ${10:FinalState}",
+      "\t\tby ${8:RoleName}",
+      "}"
+    ],
+    "description": "Create a complete BPML file template"
+  }
+}

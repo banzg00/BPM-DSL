@@ -1,0 +1,53 @@
+{
+  "name": "bpml-language-support",
+  "displayName": "BPML Language Support",
+  "description": "Language support for Business Process Modeling Language (BPML)",
+  "version": "0.1.0",
+  "publisher": "bpml",
+  "engines": {
+    "vscode": "^1.75.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "keywords": [
+    "bpml",
+    "business process",
+    "dsl",
+    "workflow"
+  ],
+  "icon": "icon.png",
+  "contributes": {
+    "languages": [
+      {
+        "id": "bpml",
+        "aliases": [
+          "BPML",
+          "Business Process Modeling Language"
+        ],
+        "extensions": [
+          ".bpml"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "bpml",
+        "scopeName": "source.bpml",
+        "path": "./syntaxes/bpml.tmLanguage.json"
+      }
+    ],
+    "snippets": [
+      {
+        "language": "bpml",
+        "path": "./snippets/bpml.json"
+      }
+    ]
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yourusername/bpml-vscode"
+  },
+  "license": "MIT"
+}
