@@ -189,20 +189,13 @@ public class ProcessEngine {
         // Complete tasks associated with the old state
         completeTasksForState(processInstanceId, oldState, request.getUserId());
 
-        // Check if process has reached a final state
-        List<String> finalStates = getFinalStates(definitionMap);
-        if (finalStates.contains(toState)) {
-            processInstance.setStatus(ProcessInstance.ProcessStatus.COMPLETED);
-            processInstance.setCompletedAt(LocalDateTime.now());
-            log.info("Process instance {} completed in state {}", processInstanceId, toState);
-        }
-
         ProcessInstance updatedInstance = processInstanceRepository.save(processInstance);
 
-        // Create new tasks for the new state (if not final)
-        if (processInstance.getStatus() == ProcessInstance.ProcessStatus.RUNNING) {
-            createTasksForState(updatedInstance, toState, definitionMap);
-        }
+        // Create new tasks for the new state (including final states)
+        createTasksForState(updatedInstance, toState, definitionMap);
+
+        // Check if process should be completed (final state + all tasks done)
+        checkAndCompleteProcess(updatedInstance, definitionMap);
 
         log.info("Transition {} executed successfully. Process moved from {} to {}",
                 transitionName, fromState, toState);
@@ -347,7 +340,63 @@ public class ProcessEngine {
         return mapToProcessInstanceDTO(savedInstance);
     }
 
+    /**
+     * Check if a process instance should be completed.
+     * Called after task completion to see if all tasks are now done.
+     */
+    @Transactional
+    public void checkProcessCompletion(Long processInstanceId) {
+        ProcessInstance processInstance = processInstanceRepository.findById(processInstanceId)
+                .orElseThrow(() -> new NotFoundException("Process instance not found: " + processInstanceId));
+
+        if (processInstance.getStatus() != ProcessInstance.ProcessStatus.RUNNING) {
+            return;
+        }
+
+        ProcessDefinition definition = processDefinitionRepository.findByProcessName(processInstance.getProcessName())
+                .orElseThrow(() -> new NotFoundException("Process definition not found: " + processInstance.getProcessName()));
+
+        Map<String, Object> definitionMap = parseDefinitionJson(definition.getDefinitionJson());
+        checkAndCompleteProcess(processInstance, definitionMap);
+    }
+
     // ===== PRIVATE HELPER METHODS =====
+
+    /**
+     * Check if process is in a final state and all tasks are completed.
+     * If so, mark the process as COMPLETED.
+     */
+    private void checkAndCompleteProcess(ProcessInstance processInstance, Map<String, Object> definitionMap) {
+        if (processInstance.getStatus() != ProcessInstance.ProcessStatus.RUNNING) {
+            return;
+        }
+
+        List<String> finalStates = getFinalStates(definitionMap);
+        if (!finalStates.contains(processInstance.getCurrentState())) {
+            return;
+        }
+
+        // Process is in a final state - check if all tasks are completed
+        List<TaskInstance> allTasks = taskInstanceRepository.findByProcessInstanceId(processInstance.getId());
+        boolean allTasksDone = allTasks.stream()
+                .allMatch(task -> task.getStatus() == TaskInstance.TaskStatus.COMPLETED ||
+                                  task.getStatus() == TaskInstance.TaskStatus.CANCELLED);
+
+        if (allTasksDone) {
+            processInstance.setStatus(ProcessInstance.ProcessStatus.COMPLETED);
+            processInstance.setCompletedAt(LocalDateTime.now());
+            processInstanceRepository.save(processInstance);
+            log.info("Process instance {} completed - all tasks done in final state {}",
+                    processInstance.getId(), processInstance.getCurrentState());
+        } else {
+            long remaining = allTasks.stream()
+                    .filter(task -> task.getStatus() != TaskInstance.TaskStatus.COMPLETED &&
+                                   task.getStatus() != TaskInstance.TaskStatus.CANCELLED)
+                    .count();
+            log.info("Process instance {} in final state {} but {} task(s) still pending",
+                    processInstance.getId(), processInstance.getCurrentState(), remaining);
+        }
+    }
 
     private void createTasksForState(ProcessInstance processInstance, String state, Map<String, Object> definitionMap) {
         List<Map<String, Object>> tasks = getTasks(definitionMap);

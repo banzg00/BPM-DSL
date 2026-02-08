@@ -208,6 +208,11 @@ public class TaskService {
         // Check and auto-complete any SYSTEM tasks that were waiting for this task
         autoCompleteSystemTasksWithSatisfiedDependencies(task.getProcessInstanceId());
 
+        // Check if process should be completed (final state + all tasks done).
+        // Also called from autoCompleteSystemTasksWithSatisfiedDependencies, but we need
+        // this here too for when no system tasks exist or none were auto-completed.
+        processEngine.checkProcessCompletion(task.getProcessInstanceId());
+
         return mapToDTO(savedTask);
     }
 
@@ -216,6 +221,7 @@ public class TaskService {
      */
     private void autoCompleteSystemTasksWithSatisfiedDependencies(Long processInstanceId) {
         List<TaskInstance> allTasks = repository.findByProcessInstanceId(processInstanceId);
+        boolean systemTaskCompleted = false;
 
         // Find all SYSTEM tasks that are still PENDING
         List<TaskInstance> pendingSystemTasks = allTasks.stream()
@@ -248,8 +254,14 @@ public class TaskService {
                     systemTask.setCompletedBy("SYSTEM");
                     repository.save(systemTask);
                     log.info("Auto-completed SYSTEM task {} after dependencies were satisfied", systemTask.getId());
+                    systemTaskCompleted = true;
                 }
             }
+        }
+
+        // If any system tasks were auto-completed, check if process should now complete
+        if (systemTaskCompleted) {
+            processEngine.checkProcessCompletion(processInstanceId);
         }
     }
 
