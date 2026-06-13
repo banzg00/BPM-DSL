@@ -1,9 +1,9 @@
 {
-  "name": "bpml-language-support",
-  "displayName": "BPML Language Support",
-  "description": "Language support for Business Process Modeling Language (BPML)",
+  "name": "flg-language-support",
+  "displayName": "FlowGen Language Support",
+  "description": "Language support for Business Process Modeling Language (FlowGen)",
   "version": "0.1.0",
-  "publisher": "bpml",
+  "publisher": "flg",
   "engines": {
     "vscode": "^1.75.0"
   },
@@ -11,7 +11,7 @@
     "Programming Languages"
   ],
   "keywords": [
-    "bpml",
+    "flg",
     "business process",
     "dsl",
     "workflow"
@@ -20,34 +20,33 @@
   "contributes": {
     "languages": [
       {
-        "id": "bpml",
+        "id": "flg",
         "aliases": [
-          "BPML",
-          "Business Process Modeling Language"
+          "FlowGen"
         ],
         "extensions": [
-          ".bpml"
+          ".flg"
         ],
         "configuration": "./language-configuration.json"
       }
     ],
     "grammars": [
       {
-        "language": "bpml",
-        "scopeName": "source.bpml",
-        "path": "./syntaxes/bpml.tmLanguage.json"
+        "language": "flg",
+        "scopeName": "source.flg",
+        "path": "./syntaxes/flg.tmLanguage.json"
       }
     ],
     "snippets": [
       {
-        "language": "bpml",
-        "path": "./snippets/bpml.json"
+        "language": "flg",
+        "path": "./snippets/flg.json"
       }
     ]
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/yourusername/bpml-vscode"
+    "url": "https://github.com/yourusername/flg-vscode"
   },
   "license": "MIT"
 }

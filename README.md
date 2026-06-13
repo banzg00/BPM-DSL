@@ -1,6 +1,6 @@
 # BPM-DSL
 
-**BPML (Business Process Modeling Language)** - A domain-specific language for business process management with full-stack code generation.
+**FlowGen (process FLOW + code GENerator)** - A domain-specific language for business process management with full-stack code generation.
 
 ![Version](https://img.shields.io/badge/version-1.0.0-blue)
 ![Python](https://img.shields.io/badge/python-3.7+-green)
@@ -8,7 +8,7 @@
 
 ## Overview
 
-BPM-DSL is a complete Domain-Specific Language (DSL) that enables developers to declaratively define business processes and automatically generate full-stack applications. Write your business process logic once in BPML and generate:
+BPM-DSL is a complete Domain-Specific Language (DSL) that enables developers to declaratively define business processes and automatically generate full-stack applications. Write your business process logic once in FlowGen and generate:
 
 - **Spring Boot backend** with JPA entities, REST APIs, and a complete process execution engine
 - **React frontend** with TypeScript, Material-UI components, and process management interfaces
@@ -40,28 +40,28 @@ pip install -e .
 
 ### Usage
 
-1. **Define your business process** in a `.bpml` file
+1. **Define your business process** in a `.flg` file
 2. **Generate Spring Boot backend**:
    ```bash
-   textx generate .\bpml\examples\example.bpml --target springboot -o ./bpml/examples/example_output --overwrite --language bpml
+   textx generate .\flg\examples\example.flg --target springboot -o ./flg/examples/example_output --overwrite --language flg
    ```
 3. **Generate React frontend**:
    ```bash
-   textx generate .\bpml\examples\example.bpml --target react -o ./bpml/examples/example_output --overwrite --language bpml
+   textx generate .\flg\examples\example.flg --target react -o ./flg/examples/example_output --overwrite --language flg
    ```
 
-## BPML Language Syntax
+## FlowGen Language Syntax
 
 ### Basic Structure
 
-A BPML file contains project metadata and one or more process definitions:
+A FlowGen file contains project metadata and one or more process definitions:
 
-```bpml
+```flg
 project {
     name: InvoiceApprovalSystem
     description: "Automated invoice approval workflow"
     version: "1.0.0"
-    author: "BPML Team"
+    author: "FlowGen Team"
 }
 
 process InvoiceApproval {
@@ -75,7 +75,7 @@ process InvoiceApproval {
 
 Define business data structures with typed attributes:
 
-```bpml
+```flg
 entity Invoice {
     invoiceNumber: string
     vendor: string
@@ -97,7 +97,7 @@ entity Invoice {
 
 Define who can participate in the process, with optional supervision hierarchy:
 
-```bpml
+```flg
 role Employee
 role Manager supervises Employee
 role FinanceTeam
@@ -110,7 +110,7 @@ role CFO supervises Manager, FinanceTeam
 
 Define the possible states a process instance can be in:
 
-```bpml
+```flg
 state DraftState
 state SubmittedForApprovalState
 state ManagerReviewState
@@ -123,7 +123,7 @@ state CompletedState
 
 Define work items assigned to states, with optional dependencies:
 
-```bpml
+```flg
 task InitTask in DraftState by Employee
 task CreateInvoice in DraftState by Employee affects Invoice
 task SubmitInvoice in DraftState auto affects Invoice depends_on InitTask, CreateInvoice
@@ -139,7 +139,7 @@ task ReviewByManager in ManagerReviewState by Manager affects Invoice, ApprovalR
 
 Define how the process moves between states with role-based authorization:
 
-```bpml
+```flg
 transition ManagerApprovesTransition
     from ManagerReviewState
     to ApprovedState
@@ -153,7 +153,7 @@ transition RejectInvoiceTransition
 
 ### Complete Example
 
-See [bpml/examples/example.bpml](bpml/examples/example.bpml) for two complete examples:
+See [flg/examples/example.flg](flg/examples/example.flg) for two complete examples:
 - **InvoiceApproval** - Multi-level approval workflow with payment processing
 - **EmployeeOnboarding** - New employee onboarding with equipment and training
 
@@ -167,7 +167,7 @@ The generator creates a complete Spring Boot application with:
 generated_springboot/
 └── [project-name]/
     ├── pom.xml                           # Maven configuration
-    ├── src/main/java/com/bpml/[project]/
+    ├── src/main/java/com/flg/[project]/
     │   ├── [ProjectName]Application.java # Spring Boot entry point
     │   ├── model/                        # JPA Entities
     │   │   ├── [Entity].java            # Your business entities
@@ -296,9 +296,9 @@ Process metadata including states, transitions, roles, and steps are stored as J
 
 ```
 BPM-DSL/
-├── bpml/                          # Main Python package
+├── flg/                          # Main Python package
 │   ├── language/                  # DSL language definition
-│   │   ├── bpml.tx               # TextX grammar
+│   │   ├── flg.tx               # TextX grammar
 │   │   ├── processors.py         # Semantic validation
 │   │   ├── builtins.py           # Type system mappings
 │   │   └── custom_model.py       # Custom model classes
@@ -312,7 +312,7 @@ BPM-DSL/
 │   │       ├── string_format_util.py
 │   │       └── file_util.py
 │   └── examples/
-│       ├── example.bpml          # Example processes
+│       ├── example.flg          # Example processes
 │       └── example_output/       # Generated code samples
 ├── setup.py                       # Package configuration
 ├── setup.cfg                      # Extended configuration
@@ -321,7 +321,7 @@ BPM-DSL/
 
 ## Development Workflow
 
-1. **Define Process Model** - Create your `.bpml` file with entities, roles, states, and workflows
+1. **Define Process Model** - Create your `.flg` file with entities, roles, states, and workflows
 2. **Validate Model** - The TextX parser validates syntax and semantics
 3. **Generate Backend** - Run the Spring Boot generator
 4. **Generate Frontend** - Run the React generator
@@ -362,7 +362,7 @@ BPM-DSL/
 
 ## Semantic Validation
 
-The BPML language includes comprehensive validation:
+The FlowGen language includes comprehensive validation:
 
 - ✅ Project name is required
 - ✅ No duplicate process names
@@ -424,7 +424,7 @@ Process instances can be suspended (paused) and later resumed, useful for:
 
 ## Examples
 
-The project includes two complete example processes in [bpml/examples/example.bpml](bpml/examples/example.bpml):
+The project includes two complete example processes in [flg/examples/example.flg](flg/examples/example.flg):
 
 ### 1. Invoice Approval System
 A multi-level approval workflow with:

@@ -1,0 +1,212 @@
+// Invoice Approval Business Process
+// This demonstrates a complete business process with entities, roles, states, and workflow
+
+project {
+    name: InvoiceApprovalSystem
+    description: "Automated invoice approval workflow with multi-level authorization"
+    version: "1.0.0"
+    author: "FlowGen Team"
+}
+
+process InvoiceApproval {
+    // Define the domain entities
+    entity Invoice {
+        invoiceNumber: string
+        vendor: string
+        amount: float
+        description: string
+        invoiceDate: string
+        dueDate: string
+        category: enum { SUPPLIES, SERVICES, EQUIPMENT, TRAVEL }
+        attachmentUrl: string
+    }
+
+    entity ApprovalRecord {
+        approver: string
+        decision: enum { APPROVED, REJECTED, PENDING }
+        comments: string
+        timestamp: string
+    }
+
+    entity PaymentInfo {
+        paymentMethod: enum { BANK_TRANSFER, CHECK, CREDIT_CARD }
+        paymentDate: string
+        transactionId: string
+    }
+
+    // Define roles in the process with hierarchy
+    role Employee
+    role Manager supervises Employee
+    role FinanceTeam
+    role CFO supervises Manager, FinanceTeam
+
+    // Define process states
+    state DraftState
+    state SubmittedForApprovalState
+    state ManagerReviewState
+    state FinanceReviewState
+    state CFOApprovalState
+    state ApprovedState
+    state RejectedState
+    state PaymentProcessingState
+    state CompletedState
+
+    // Define workflow tasks (tasks belong to specific states)
+    task InitTask in DraftState by Employee
+    task CreateInvoice in DraftState by Employee affects Invoice
+    task SubmitInvoice in DraftState auto affects Invoice depends_on InitTask, CreateInvoice
+    task ReviewByManager in SubmittedForApprovalState by Manager affects Invoice, ApprovalRecord
+    task ReviewByFinance in FinanceReviewState by FinanceTeam affects Invoice, ApprovalRecord
+    task ApprovalByCFO in CFOApprovalState by CFO affects Invoice, ApprovalRecord
+    task ProcessPayment in PaymentProcessingState by CFO affects PaymentInfo
+    task RecordApproval in ManagerReviewState by Manager affects ApprovalRecord depends_on ReviewByManager
+    task RecordFinanceApproval in FinanceReviewState by FinanceTeam affects ApprovalRecord depends_on ReviewByFinance
+    task RecordCFOApproval in CFOApprovalState by CFO affects ApprovalRecord depends_on ApprovalByCFO
+    task RejectInvoice in RejectedState by Manager affects Invoice
+    task CloseInvoice in CompletedState by CFO affects Invoice, PaymentInfo depends_on ProcessPayment
+    task NotifyStakeholders in CompletedState auto depends_on CloseInvoice
+
+    // Define state transitions
+    transition InitiateDraftTransition
+        from DraftState
+        to SubmittedForApprovalState
+        by Employee
+
+    transition SendToManagerTransition
+        from SubmittedForApprovalState
+        to ManagerReviewState
+        by Employee
+
+    transition ManagerApprovesTransition
+        from ManagerReviewState
+        to FinanceReviewState
+        by Manager
+
+    transition ManagerRejectsTransition
+        from ManagerReviewState
+        to RejectedState
+        by Manager
+
+    transition FinanceApprovesTransition
+        from FinanceReviewState
+        to CFOApprovalState
+        by FinanceTeam
+
+    transition FinanceRejectsTransition
+        from FinanceReviewState
+        to RejectedState
+        by FinanceTeam
+
+    transition CFOApprovesTransition
+        from CFOApprovalState
+        to ApprovedState
+        by CFO
+
+    transition CFORejectsTransition
+        from CFOApprovalState
+        to RejectedState
+        by CFO
+
+    transition SendToPaymentTransition
+        from ApprovedState
+        to PaymentProcessingState
+        by CFO
+
+    transition CompleteProcessTransition
+        from PaymentProcessingState
+        to CompletedState
+        by CFO
+}
+
+
+// Second process example: Employee Onboarding
+process EmployeeOnboarding {
+    // Domain entities for onboarding
+    entity Employee {
+        firstName: string
+        lastName: string
+        email: string
+        phone: string
+        position: string
+        department: string
+        startDate: string
+        employeeId: string
+    }
+
+    entity Equipment {
+        laptopModel: string
+        phoneNumber: string
+        accessCard: string
+        isAssigned: boolean
+    }
+
+    entity TrainingRecord {
+        trainingModule: string
+        completedDate: string
+        score: int
+        isPassed: boolean
+    }
+
+    // Roles with hierarchy
+    role NewEmployee
+    role HR supervises NewEmployee
+    role ITSupport
+    role Trainer
+    role Supervisor supervises HR, ITSupport, Trainer
+
+    // States
+    state NewState
+    state DocumentsSubmittedState
+    state BackgroundCheckState
+    state ApprovedOnboardingState
+    state EquipmentSetupState
+    state TrainingScheduledState
+    state InTrainingState
+    state ActiveState
+
+    // Tasks with dependencies
+    task SubmitDocuments in NewState by NewEmployee affects Employee
+    task VerifyDocuments in DocumentsSubmittedState by HR affects Employee depends_on SubmitDocuments
+    task RunBackgroundCheck in BackgroundCheckState by HR affects Employee depends_on VerifyDocuments
+    task SetupWorkstation in EquipmentSetupState by ITSupport affects Equipment
+    task AssignEquipment in EquipmentSetupState by ITSupport affects Equipment depends_on SetupWorkstation
+    task ScheduleOrientation in TrainingScheduledState by HR affects TrainingRecord depends_on AssignEquipment
+    task ConductTraining in InTrainingState by Trainer affects TrainingRecord depends_on ScheduleOrientation
+    task ActivateEmployee in ActiveState by Supervisor affects Employee depends_on ConductTraining
+
+    // Transitions
+    transition SubmitEmployeeInfoTransition
+        from NewState
+        to DocumentsSubmittedState
+        by NewEmployee
+
+    transition InitiateBackgroundCheckTransition
+        from DocumentsSubmittedState
+        to BackgroundCheckState
+        by HR
+
+    transition ApproveOnboardingTransition
+        from BackgroundCheckState
+        to ApprovedOnboardingState
+        by HR
+
+    transition PrepareEquipmentTransition
+        from ApprovedOnboardingState
+        to EquipmentSetupState
+        by ITSupport
+
+    transition ScheduleTrainingTransition
+        from EquipmentSetupState
+        to TrainingScheduledState
+        by HR
+
+    transition BeginTrainingTransition
+        from TrainingScheduledState
+        to InTrainingState
+        by Trainer
+
+    transition CompleteOnboardingTransition
+        from InTrainingState
+        to ActiveState
+        by Supervisor
+}

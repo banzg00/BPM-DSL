@@ -1,18 +1,18 @@
-# BPML Language Support for VSCode
+# FlowGen Language Support for VSCode
 
-Language support for **Business Process Modeling Language (BPML)** in Visual Studio Code.
+Language support for **FlowGen** in Visual Studio Code.
 
 ## Features
 
-- **Syntax Highlighting** - Full keyword and syntax highlighting for `.bpml` files
-- **Code Snippets** - Useful snippets for quick scaffolding of BPML constructs
+- **Syntax Highlighting** - Full keyword and syntax highlighting for `.flg` files
+- **Code Snippets** - Useful snippets for quick scaffolding of FlowGen constructs
 - **Auto-completion** - Bracket and quote auto-closing
 - **Code Folding** - Fold/unfold code blocks
 - **Comment Support** - Line comments with `//`
 
 ## Syntax Highlighting
 
-The extension provides syntax highlighting for all BPML language constructs:
+The extension provides syntax highlighting for all FlowGen language constructs:
 
 - **Keywords**: `project`, `process`, `entity`, `role`, `state`, `task`, `transition`
 - **Modifiers**: `name`, `description`, `version`, `author`, `supervises`, `from`, `to`, `by`, `in`, `affects`, `depends_on`, `auto`
@@ -38,18 +38,18 @@ Type the following prefixes and press `Tab` to insert code templates:
 | `task-depends` | Task with dependencies |
 | `task-auto` | Automatic task |
 | `transition` | Transition definition |
-| `bpml-template` | Complete BPML file template |
+| `flg-template` | Complete FlowGen file template |
 
 ## Example Usage
 
-Create a new file with `.bpml` extension and start typing:
+Create a new file with `.flg` extension and start typing:
 
-```bpml
+```flg
 project {
     name: InvoiceApprovalSystem
     description: "Automated invoice approval workflow"
     version: "1.0.0"
-    author: "BPML Team"
+    author: "FlowGen Team"
 }
 
 process InvoiceApproval {
@@ -88,7 +88,7 @@ process InvoiceApproval {
    - **Windows**: `%USERPROFILE%\.vscode\extensions\`
    - **macOS/Linux**: `~/.vscode/extensions/`
 
-2. Rename the folder to `bpml-language-support-0.1.0`
+2. Rename the folder to `flg-language-support-0.1.0`
 
 3. Reload VSCode
 
@@ -119,17 +119,17 @@ process InvoiceApproval {
 
 To modify or extend the extension:
 
-1. **Syntax Highlighting**: Edit `syntaxes/bpml.tmLanguage.json`
-2. **Snippets**: Edit `snippets/bpml.json`
+1. **Syntax Highlighting**: Edit `syntaxes/flg.tmLanguage.json`
+2. **Snippets**: Edit `snippets/flg.json`
 3. **Language Features**: Edit `language-configuration.json`
 
 After making changes, reload VSCode to see updates.
 
-## About BPML
+## About FlowGen
 
-BPML (Business Process Modeling Language) is a domain-specific language for defining business processes that can generate full-stack applications (Spring Boot + React).
+FlowGen is a domain-specific language for defining business processes that can generate full-stack applications (Spring Boot + React).
 
-For more information about BPML, visit the main project repository.
+For more information about FlowGen, visit the main project repository.
 
 ## License
 
